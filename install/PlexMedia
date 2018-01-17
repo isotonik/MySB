@@ -1,0 +1,105 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$gbToInstall_PlexMedia" == "YES" ]; then
+	#### Install package
+	gfnPackageBundleInstall 'alsa-base alsa-oss oss-compat libasound2-plugins plexmediaserver'
+
+	if gfnCheckCommand 0 plexmediaserver; then
+		cmdMySQL 'MySB_db' "UPDATE services SET to_install = '0', is_installed = '1' WHERE serv_name='Plex Media Server';" -v
+
+		gfnGetRepoValues 'PlexPy' && gfnRepoManageByType
+		gsRepoDirEscaped="`echo $gsRepoDir | sed s,/,\\\\\\\\\\/,g`"
+
+		if [ ! -z $gsRepoDir ] && [ -d $gsRepoDir ]; then
+			[ "$gbIsInstalled_PlexPy" == "YES" ] && gfnManageServices stop "plexpy"
+
+			# System user
+			if [ -z "`cat /etc/passwd | grep 'plexpy'`" ]; then
+				adduser --system --no-create-home plexpy --shell /bin/nologin --disabled-login --home $gsRepoDir
+			fi
+			# Directories
+			[ ! -d $gsRepoDir/backups ] && mkdir $gsRepoDir/backups
+			[ ! -d $gsRepoDir/logs ] && mkdir $gsRepoDir/logs
+			[ ! -d $gsRepoDir/cache ] && mkdir $gsRepoDir/cache
+
+			# Config.ini
+			if [ ! -f $gsRepoDir/config.ini ]; then
+				install -v -o plexpy -g nogroup -m 0644 $MySB_InstallDir/templates/plexpy/config.ini.tmpl $gsRepoDir/config.ini
+				perl -pi -e "s/<gsRepoDir>/$gsRepoDirEscaped/g" $gsRepoDir/config.ini
+				if [ -f $MySB_InstallDir/ssl/fullchain.pem ]; then
+					perl -pi -e "s/<https_cert>/$gsInstallDirEscaped\/ssl\/cert.pem/g" $gsRepoDir/config.ini
+					perl -pi -e "s/<https_key>/$gsInstallDirEscaped\/ssl\/privkey.pem/g" $gsRepoDir/config.ini
+				else
+					perl -pi -e "s/<https_cert>/$gsInstallDirEscaped\/ssl\/mysb.cert/g" $gsRepoDir/config.ini
+					perl -pi -e "s/<https_key>/$gsInstallDirEscaped\/ssl\/mysb.key/g" $gsRepoDir/config.ini
+				fi
+			fi
+
+			# Config.py
+			nNumLine=$(cat $gsRepoDir/plexpy/config.py | grep "'HTTP_ROOT':" -n -m 1 | cut -d ':' -f 1)
+			sed -i "/'HTTP_ROOT':/d" $gsRepoDir/plexpy/config.py
+			sed -i ""$nNumLine"i\    'HTTP_ROOT': (str, 'General', 'https://$gsHostNameFqdn:$gsPort_HTTPS/pp/')," $gsRepoDir/plexpy/config.py
+
+			# Webauth.py
+			perl -pi -e "s/plexpy.HTTP_ROOT \+ \"auth\/logout\"/\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\/auth\/logout\"/g" $gsRepoDir/plexpy/webauth.py
+			perl -pi -e "s/plexpy.HTTP_ROOT \+ \"auth\/login\"/\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\/auth\/login\"/g" $gsRepoDir/plexpy/webauth.py
+			perl -pi -e "s/\(plexpy.HTTP_ROOT\)/\(\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\"\)/g" $gsRepoDir/plexpy/webauth.py
+			# Webserver.py
+			perl -pi -e "s/plexpy.HTTP_ROOT \+ \"welcome\"/\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\/welcome\"/g" $gsRepoDir/plexpy/webserve.py
+			perl -pi -e "s/plexpy.HTTP_ROOT \+ \"home\"/\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\/home\"/g" $gsRepoDir/plexpy/webserve.py
+			perl -pi -e "s/plexpy.HTTP_ROOT \+ \"logs\"/\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\/logs\"/g" $gsRepoDir/plexpy/webserve.py
+			perl -pi -e "s/\(plexpy.HTTP_ROOT\)/\(\"https:\/\/$gsHostNameFqdn:$gsPort_HTTPS\/pp\"\)/g" $gsRepoDir/plexpy/webserve.py
+
+			# Directory rights
+			chown plexpy:nogroup -R $gsRepoDir
+
+			# Init script
+			install -v -o root -g root -m 0644 $MySB_InstallDir/templates/plexpy/etc.default.plexpy.tmpl /etc/default/plexpy
+			perl -pi -e "s/<gsRepoDir>/$gsRepoDirEscaped/g" /etc/default/plexpy
+			chmod +x $gsRepoDir/init-scripts/init.ubuntu
+			[ ! -h /etc/init.d/plexpy ] && ln -sv $gsRepoDir/init-scripts/init.ubuntu /etc/init.d/plexpy
+			update-rc.d plexpy defaults
+
+			# NginX
+			install -v -o root -g root -m 0644 $MySB_InstallDir/templates/nginx/etc.nginx.locations.plexpy.conf.tmpl /etc/nginx/locations/PlexPy.conf
+			install -v -o root -g root -m 0644 $MySB_InstallDir/templates/nginx/etc.nginx.proxy.plexpy.conf.tmpl /etc/nginx/proxy/PlexPy.conf
+			perl -pi -e "s/<MainUser>/$gsMainUserName/g" /etc/nginx/locations/PlexPy.conf
+
+			# START services
+			gfnManageServices start "nginx plexpy"
+
+			if [ -f $gsRepoDir/PlexPy.py ]; then
+				cmdMySQL 'MySB_db' "UPDATE services SET to_install = '0', is_installed = '1' WHERE serv_name='PlexPy';" -v
+			fi
+		fi
+	fi
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
