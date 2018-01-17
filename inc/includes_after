@@ -1,0 +1,148 @@
+#!/bin/bash
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### 1 - includes
+if [ -f /etc/MySB/config ]; then
+	source /etc/MySB/config
+	source $MySB_InstallDir/inc/vars
+else
+	echo "The config file \"/etc/MySB/config\" does not exist, aborting !"
+	exit 1
+fi
+
+#### 2 - Cleaning/Banner
+case "$ScriptName" in
+	"MySB_Install.bsh")
+		if [ "$DirName/MySB_Install.bsh" != "$MySB_InstallDir/install/MySB_Install.bsh" ]; then
+			rm -f $0
+		fi
+	;;
+	"MySB_CreateUser")
+		if [ "`screen -ls | grep MySB`" != "" ]; then
+			#### 4 - Create MySB banner
+			if [ "$BANNER" == "ON" ]; then
+				BannerGenerator
+			fi
+		fi
+	;;
+	From_*) # Upgrade ?
+		#### Statistics
+		# No credentials are retained !
+		# The server IP is only used to know the country of the SeedBox.
+		if [ -f /etc/machine-id ]; then
+			gsMachineId="`cat /etc/machine-id`"
+			[ ! -z "$gsMachineId" ] && gsResult="`curl --silent --retry 2 -A 'MySB' --data "version=$MySB_CurrentVersion&machine_id=$gsMachineId" http://mysb.is-by.us/statistics/`"
+			[ ! -z "`echo $gsResult | grep 'Statistics updated at'`" ] && echo "$gsResult" > $MySB_InstallDir/statistics
+		fi
+	;;
+esac
+
+#### 3 - End Script
+if [ "$END" == "ON" ]; then
+	echo "--------------------"
+	log_daemon_msg "Update the man database (mandb)"
+	/usr/bin/mandb -q
+	StatusLSB
+
+	# if CheckCommand 0 updatedb; then
+		# log_daemon_msg "Update the slocate database (updatedb)"
+		# /usr/bin/updatedb
+		# StatusLSB
+	# fi
+	if CheckCommand 0 ldconfig; then
+		log_daemon_msg "Configure dynamic linker run-time bindings (ldconfig)"
+		/sbin/ldconfig
+		StatusLSB
+	fi
+	if [ -z $IFPVEKERNEL ]; then
+		log_daemon_msg "Drop caches system"
+		#### Free cache server
+		## To free pagecache
+		#sync; echo 1 > /proc/sys/vm/drop_caches
+		## To release dentries and inodes
+		#sync; echo 2 > /proc/sys/vm/drop_caches
+		## To free pagecache, dentries and inodes
+		sync; echo 3 > /proc/sys/vm/drop_caches
+		## Default
+		#sync; echo 0 > /proc/sys/vm/drop_caches
+		StatusLSB
+	fi
+fi
+
+#### 4 - create ccze files (HTML)
+case "$DirName" in
+	"$MySB_InstallDir/bin")
+		DirLog="$MySB_InstallDir/web/logs/bin"
+	;;
+	"$MySB_InstallDir/install")
+		DirLog="$MySB_InstallDir/web/logs/install"
+	;;
+	"$MySB_InstallDir/scripts")
+		DirLog="$MySB_InstallDir/web/logs/scripts"
+	;;
+	"$MySB_InstallDir/upgrade")
+		DirLog="$MySB_InstallDir/web/logs/upgrade"
+	;;
+	*)
+		DirLog="$MySB_InstallDir/web/logs"
+	;;
+esac
+if [ ! -d $DirLog ]; then mkdir -p $DirLog; fi
+
+if [ "$ScriptName" == "MySB_Install.bsh" ]; then
+	TIMESTAMP=ON
+	DirLog="$MySB_InstallDir/web/logs/install"
+	if [ -f /tmp/$ScriptName.log ]; then 
+		cat /tmp/$ScriptName.log > $MySB_InstallDir/logs/$ScriptName.log
+		rm -f /tmp/$ScriptName.log
+	fi
+fi
+
+if [ "$TIMESTAMP" == "ON" ]; then
+	echo "------------------------------------------------------------" >> $MySB_InstallDir/logs/$ScriptName.log
+	echo "END Out/Err: "`date` "-" $ScriptName $1 >> $MySB_InstallDir/logs/$ScriptName.log
+	echo "------------------------------------------------------------" >> $MySB_InstallDir/logs/$ScriptName.log
+fi
+if [ -f $MySB_InstallDir/logs/$ScriptName.log ]; then
+	ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < $MySB_InstallDir/logs/$ScriptName.log > $DirLog/$ScriptName-log.html
+fi
+
+#### Reboot after install
+if [ "$REBOOT" == "$Global_YES" ]; then
+	#### Restart some services
+	if CheckCommand 0 bind9; then ServicesToRestart="bind9"; fi
+	if CheckCommand 0 dnscrypt-proxy; then ServicesToRestart="${ServicesToRestart} dnscrypt-proxy"; fi
+	if CheckCommand 0 stunnel4; then ServicesToRestart="${ServicesToRestart} stunnel4"; fi
+	if CheckCommand 0 postfix; then ServicesToRestart="${ServicesToRestart} postfix"; fi
+	ManageServices start "$ServicesToRestart"
+
+	#### Flush mail queue
+	if CheckCommand 0 postfix; then postfix flush; fi
+	echo ""
+	echo -e -n "${CRED}$Global_ServerWillRestart$CEND"
+	CountDown 30
+	reboot
+fi
+
+##################### LAST LINE ######################################

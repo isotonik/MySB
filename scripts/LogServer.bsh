@@ -1,0 +1,568 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### access
+log_daemon_msg "HTML Convert of access.log"
+if [ -e /var/log/nginx/access.log.1 ]; then
+	cat /var/log/nginx/access.log.1 /var/log/nginx/access.log > /tmp/access.log
+else
+	if [ -e /var/log/nginx/access.log ]; then
+		cp /var/log/nginx/access.log /tmp/access.log
+	fi
+fi
+if [ -e /tmp/access.log ]; then
+	sed -i '/favicon.ico/d' /tmp/access.log
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/access.html
+	rm -f /tmp/access.log
+fi
+StatusLSB
+
+#### error
+log_daemon_msg "HTML Convert of error.log"
+if [ -e /var/log/nginx/error.log.1 ]; then
+	cat /var/log/nginx/error.log.1 /var/log/nginx/error.log > /tmp/error.log
+else
+	if [ -e /var/log/nginx/error.log ]; then
+		cp /var/log/nginx/error.log /tmp/error.log
+	fi
+fi
+if [ -e /tmp/error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/error.html
+	rm -f /tmp/error.log
+fi
+StatusLSB
+
+#### default-access
+log_daemon_msg "HTML Convert of default-access.log"
+if [ -e /var/log/nginx/default-access.log.1 ]; then
+	cat /var/log/nginx/default-access.log.1 /var/log/nginx/default-access.log > /tmp/default-access.log
+else
+	if [ -e /var/log/nginx/default-access.log ]; then
+		cp /var/log/nginx/default-access.log /tmp/default-access.log
+	fi
+fi
+if [ -e /tmp/default-access.log ]; then
+	sed -i '/favicon.ico/d' /tmp/default-access.log
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/default-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/default-access.html
+	rm -f /tmp/default-access.log
+fi
+StatusLSB
+
+#### default-error
+log_daemon_msg "HTML Convert of default-error.log"
+if [ -e /var/log/nginx/default-error.log.1 ]; then
+	cat /var/log/nginx/default-error.log.1 /var/log/nginx/default-error.log > /tmp/default-error.log
+else
+	if [ -e /var/log/nginx/default-error.log ]; then
+		cp /var/log/nginx/default-error.log /tmp/default-error.log
+	fi
+fi
+if [ -e /tmp/default-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/default-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/default-error.html
+	rm -f /tmp/default-error.log
+fi
+StatusLSB
+
+#### MySB-access
+log_daemon_msg "HTML Convert of MySB-access.log"
+if [ -e /var/log/nginx/MySB-access.log.1 ]; then
+	cat /var/log/nginx/MySB-access.log.1 /var/log/nginx/MySB-access.log > /tmp/MySB-access.log
+else
+	if [ -e /var/log/nginx/MySB-access.log ]; then
+		cp /var/log/nginx/MySB-access.log /tmp/MySB-access.log
+	fi
+fi
+if [ -e /tmp/MySB-access.log ]; then
+	sed -i '/favicon.ico/d' /tmp/MySB-access.log
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/MySB-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/MySB-access.html
+	rm -f /tmp/MySB-access.log
+fi
+StatusLSB
+
+#### MySB-error
+log_daemon_msg "HTML Convert of MySB-error.log"
+if [ -e /var/log/nginx/MySB-error.log.1 ]; then
+	cat /var/log/nginx/MySB-error.log.1 /var/log/nginx/MySB-error.log > /tmp/MySB-error.log
+else
+	if [ -e /var/log/nginx/MySB-error.log ]; then
+		cp /var/log/nginx/MySB-error.log /tmp/MySB-error.log
+	fi
+fi
+if [ -e /tmp/MySB-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/MySB-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/MySB-error.html
+	rm -f /tmp/MySB-error.log
+fi
+StatusLSB
+
+#### cakebox-access
+log_daemon_msg "HTML Convert of cakebox-access.log"
+if [ -e /var/log/nginx/cakebox-access.log.1 ]; then
+	cat /var/log/nginx/cakebox-access.log.1 /var/log/nginx/cakebox-access.log > /tmp/cakebox-access.log
+else
+	if [ -e /var/log/nginx/cakebox-access.log ]; then
+		cp /var/log/nginx/cakebox-access.log /tmp/cakebox-access.log
+	fi
+fi
+if [ -e /tmp/cakebox-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/cakebox-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/cakebox-access.html
+	rm -f /tmp/cakebox-access.log
+fi
+StatusLSB
+
+#### cakebox-error
+log_daemon_msg "HTML Convert of cakebox-error.log"
+if [ -e /var/log/nginx/cakebox-error.log.1 ]; then
+	cat /var/log/nginx/cakebox-error.log.1 /var/log/nginx/cakebox-error.log > /tmp/cakebox-error.log
+else
+	if [ -e /var/log/nginx/cakebox-error.log ]; then
+		cp /var/log/nginx/cakebox-error.log /tmp/cakebox-error.log
+	fi
+fi
+if [ -e /tmp/cakebox-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/cakebox-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/cakebox-error.html
+	rm -f /tmp/cakebox-error.log
+fi
+StatusLSB
+
+#### seedbox-manager-access
+log_daemon_msg "HTML Convert of seedbox-manager-access.log"
+if [ -e /var/log/nginx/seedbox-manager-access.log.1 ]; then
+	cat /var/log/nginx/seedbox-manager-access.log.1 /var/log/nginx/seedbox-manager-access.log > /tmp/seedbox-manager-access.log
+else
+	if [ -e /var/log/nginx/seedbox-manager-access.log ]; then
+		cp /var/log/nginx/seedbox-manager-access.log /tmp/seedbox-manager-access.log
+	fi
+fi
+if [ -e /tmp/seedbox-manager-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/seedbox-manager-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/seedbox-manager-access.html
+	rm -f /tmp/seedbox-manager-access.log
+fi
+StatusLSB
+
+#### seedbox-manager-error
+log_daemon_msg "HTML Convert of seedbox-manager-error.log"
+if [ -e /var/log/nginx/seedbox-manager-error.log.1 ]; then
+	cat /var/log/nginx/seedbox-manager-error.log.1 /var/log/nginx/seedbox-manager-error.log > /tmp/seedbox-manager-error.log
+else
+	if [ -e /var/log/nginx/seedbox-manager-error.log ]; then
+		cp /var/log/nginx/seedbox-manager-error.log /tmp/seedbox-manager-error.log
+	fi
+fi
+if [ -e /tmp/seedbox-manager-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/seedbox-manager-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/seedbox-manager-error.html
+	rm -f /tmp/seedbox-manager-error.log
+fi
+StatusLSB
+
+#### rutorrent-access
+log_daemon_msg "HTML Convert of rutorrent-access.log"
+if [ -e /var/log/nginx/rutorrent-access.log.1 ]; then
+	cat /var/log/nginx/rutorrent-access.log.1 /var/log/nginx/rutorrent-access.log > /tmp/rutorrent-access.log
+else
+	if [ -e /var/log/nginx/rutorrent-access.log ]; then
+		cp /var/log/nginx/rutorrent-access.log /tmp/rutorrent-access.log
+	fi
+fi
+if [ -e /tmp/rutorrent-access.log ]; then
+	sed -i '/plugins/d' /tmp/rutorrent-access.log
+	sed -i '/getsettings.php/d' /tmp/rutorrent-access.log
+	sed -i '/setsettings.php/d' /tmp/rutorrent-access.log
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/rutorrent-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/rutorrent-access.html
+	rm -f /tmp/rutorrent-access.log
+fi
+StatusLSB
+
+#### rutorrent-error
+log_daemon_msg "HTML Convert of rutorrent-error.log"
+if [ -e /var/log/nginx/rutorrent-error.log.1 ]; then
+	cat /var/log/nginx/rutorrent-error.log.1 /var/log/nginx/rutorrent-error.log > /tmp/rutorrent-error.log
+else
+	if [ -e /var/log/nginx/rutorrent-error.log ]; then
+		cp /var/log/nginx/rutorrent-error.log /tmp/rutorrent-error.log
+	fi
+fi
+if [ -e /tmp/rutorrent-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/rutorrent-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/rutorrent-error.html
+	rm -f /tmp/rutorrent-error.log
+fi
+StatusLSB
+
+#### fileshare-access
+log_daemon_msg "HTML Convert of fileshare-access.log"
+if [ -e /var/log/nginx/fileshare-access.log.1 ]; then
+	cat /var/log/nginx/fileshare-access.log.1 /var/log/nginx/fileshare-access.log > /tmp/fileshare-access.log
+else
+	if [ -e /var/log/nginx/fileshare-access.log ]; then
+		cp /var/log/nginx/fileshare-access.log /tmp/fileshare-access.log
+	fi
+fi
+if [ -e /tmp/fileshare-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/fileshare-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/fileshare-access.html
+	rm -f /tmp/fileshare-access.log
+fi
+StatusLSB
+
+#### fileshare-error
+log_daemon_msg "HTML Convert of fileshare-error.log"
+if [ -e /var/log/nginx/fileshare-error.log.1 ]; then
+	cat /var/log/nginx/fileshare-error.log.1 /var/log/nginx/fileshare-error.log > /tmp/fileshare-error.log
+else
+	if [ -e /var/log/nginx/fileshare-error.log ]; then
+		cp /var/log/nginx/fileshare-error.log /tmp/fileshare-error.log
+	fi
+fi
+if [ -e /tmp/fileshare-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/fileshare-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/fileshare-error.html
+	rm -f /tmp/fileshare-error.log
+fi
+StatusLSB
+
+#### ForceAddress-access
+log_daemon_msg "HTML Convert of ForceAddress-access.log"
+if [ -e /var/log/nginx/ForceAddress-access.log.1 ]; then
+	cat /var/log/nginx/ForceAddress-access.log.1 /var/log/nginx/ForceAddress-access.log > /tmp/ForceAddress-access.log
+else
+	if [ -e /var/log/nginx/ForceAddress-access.log ]; then
+		cp /var/log/nginx/ForceAddress-access.log /tmp/ForceAddress-access.log
+	fi
+fi
+if [ -e /tmp/ForceAddress-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/ForceAddress-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/ForceAddress-access.html
+	rm -f /tmp/ForceAddress-access.log
+fi
+StatusLSB
+
+#### ForceAddress-error
+log_daemon_msg "HTML Convert of ForceAddress-error.log"
+if [ -e /var/log/nginx/ForceAddress-error.log.1 ]; then
+	cat /var/log/nginx/ForceAddress-error.log.1 /var/log/nginx/ForceAddress-error.log > /tmp/ForceAddress-error.log
+else
+	if [ -e /var/log/nginx/ForceAddress-error.log ]; then
+		cp /var/log/nginx/ForceAddress-error.log /tmp/ForceAddress-error.log
+	fi
+fi
+if [ -e /tmp/ForceAddress-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/ForceAddress-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/ForceAddress-error.html
+	rm -f /tmp/ForceAddress-error.log
+fi
+StatusLSB
+
+#### loadavg-access
+log_daemon_msg "HTML Convert of loadavg-access.log"
+if [ -e /var/log/nginx/loadavg-access.log.1 ]; then
+	cat /var/log/nginx/loadavg-access.log.1 /var/log/nginx/loadavg-access.log > /tmp/loadavg-access.log
+else
+	if [ -e /var/log/nginx/loadavg-access.log ]; then
+		cp /var/log/nginx/loadavg-access.log /tmp/loadavg-access.log
+	fi
+fi
+if [ -e /tmp/loadavg-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/loadavg-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/loadavg-access.html
+	rm -f /tmp/loadavg-access.log
+fi
+StatusLSB
+
+#### loadavg-error
+log_daemon_msg "HTML Convert of loadavg-error.log"
+if [ -e /var/log/nginx/loadavg-error.log.1 ]; then
+	cat /var/log/nginx/loadavg-error.log.1 /var/log/nginx/loadavg-error.log > /tmp/loadavg-error.log
+else
+	if [ -e /var/log/nginx/loadavg-error.log ]; then
+		cp /var/log/nginx/loadavg-error.log /tmp/loadavg-error.log
+	fi
+fi
+if [ -e /tmp/loadavg-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/loadavg-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/loadavg-error.html
+	rm -f /tmp/loadavg-error.log
+fi
+StatusLSB
+
+#### NewUser-access
+log_daemon_msg "HTML Convert of NewUser-access.log"
+if [ -e /var/log/nginx/NewUser-access.log.1 ]; then
+	cat /var/log/nginx/NewUser-access.log.1 /var/log/nginx/NewUser-access.log > /tmp/NewUser-access.log
+else
+	if [ -e /var/log/nginx/NewUser-access.log ]; then
+		cp /var/log/nginx/NewUser-access.log /tmp/NewUser-access.log
+	fi
+fi
+if [ -e /tmp/NewUser-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/NewUser-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/NewUser-access.html
+	rm -f /tmp/NewUser-access.log
+fi
+StatusLSB
+
+#### NewUser-error
+log_daemon_msg "HTML Convert of NewUser-error.log"
+if [ -e /var/log/nginx/NewUser-error.log.1 ]; then
+	cat /var/log/nginx/NewUser-error.log.1 /var/log/nginx/NewUser-error.log > /tmp/NewUser-error.log
+else
+	if [ -e /var/log/nginx/NewUser-error.log ]; then
+		cp /var/log/nginx/NewUser-error.log /tmp/NewUser-error.log
+	fi
+fi
+if [ -e /tmp/NewUser-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/NewUser-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/NewUser-error.html
+	rm -f /tmp/NewUser-error.log
+fi
+StatusLSB
+
+#### stream-access
+log_daemon_msg "HTML Convert of stream-access.log"
+if [ -e /var/log/nginx/stream-access.log.1 ]; then
+	cat /var/log/nginx/stream-access.log.1 /var/log/nginx/stream-access.log > /tmp/stream-access.log
+else
+	if [ -e /var/log/nginx/stream-access.log ]; then
+		cp /var/log/nginx/stream-access.log /tmp/stream-access.log
+	fi
+fi
+if [ -e /tmp/stream-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/stream-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/stream-access.html
+	rm -f /tmp/stream-access.log
+fi
+StatusLSB
+
+#### stream-error
+log_daemon_msg "HTML Convert of stream-error.log"
+if [ -e /var/log/nginx/stream-error.log.1 ]; then
+	cat /var/log/nginx/stream-error.log.1 /var/log/nginx/stream-error.log > /tmp/stream-error.log
+else
+	if [ -e /var/log/nginx/stream-error.log ]; then
+		cp /var/log/nginx/stream-error.log /tmp/stream-error.log
+	fi
+fi
+if [ -e /tmp/stream-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/stream-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/stream-error.html
+	rm -f /tmp/stream-error.log
+fi
+StatusLSB
+
+#### view-access
+log_daemon_msg "HTML Convert of view-access.log"
+if [ -e /var/log/nginx/view-access.log.1 ]; then
+	cat /var/log/nginx/view-access.log.1 /var/log/nginx/view-access.log > /tmp/view-access.log
+else
+	if [ -e /var/log/nginx/view-access.log ]; then
+		cp /var/log/nginx/view-access.log /tmp/view-access.log
+	fi
+fi
+if [ -e /tmp/view-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/view-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/view-access.html
+	rm -f /tmp/view-access.log
+fi
+StatusLSB
+
+#### view-error
+log_daemon_msg "HTML Convert of view-error.log"
+if [ -e /var/log/nginx/view-error.log.1 ]; then
+	cat /var/log/nginx/view-error.log.1 /var/log/nginx/view-error.log > /tmp/view-error.log
+else
+	if [ -e /var/log/nginx/view-error.log ]; then
+		cp /var/log/nginx/view-error.log /tmp/view-error.log
+	fi
+fi
+if [ -e /tmp/view-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/view-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/view-error.html
+	rm -f /tmp/view-error.log
+fi
+StatusLSB
+
+#### UserInfoMail-access
+log_daemon_msg "HTML Convert of UserInfoMail-access.log"
+if [ -e /var/log/nginx/UserInfoMail-access.log.1 ]; then
+	cat /var/log/nginx/UserInfoMail-access.log.1 /var/log/nginx/UserInfoMail-access.log > /tmp/UserInfoMail-access.log
+else
+	if [ -e /var/log/nginx/UserInfoMail-access.log ]; then
+		cp /var/log/nginx/UserInfoMail-access.log /tmp/UserInfoMail-access.log
+	fi
+fi
+if [ -e /tmp/UserInfoMail-access.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/UserInfoMail-access.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/UserInfoMail-access.html
+	rm -f /tmp/UserInfoMail-access.log
+fi
+StatusLSB
+
+#### UserInfoMail-error
+log_daemon_msg "HTML Convert of UserInfoMail-error.log"
+if [ -e /var/log/nginx/UserInfoMail-error.log.1 ]; then
+	cat /var/log/nginx/UserInfoMail-error.log.1 /var/log/nginx/UserInfoMail-error.log > /tmp/UserInfoMail-error.log
+else
+	if [ -e /var/log/nginx/UserInfoMail-error.log ]; then
+		cp /var/log/nginx/UserInfoMail-error.log /tmp/UserInfoMail-error.log
+	fi
+fi
+if [ -e /tmp/UserInfoMail-error.log ]; then
+	ccze -h -p httpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/UserInfoMail-error.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/UserInfoMail-error.html
+	rm -f /tmp/UserInfoMail-error.log
+fi
+StatusLSB
+
+#### ownCloud
+if [ "$IsInstalled_ownCloud" == "YES" ]; then
+	log_daemon_msg "HTML Convert of ownCloud log"
+	if [ -e /home/owncloud/owncloud.log.1 ]; then
+		cat /home/owncloud/owncloud.log.1 /home/owncloud/owncloud.log > /tmp/owncloud.log
+	else
+		if [ -e /home/owncloud/owncloud.log ]; then
+			cp /home/owncloud/owncloud.log /tmp/owncloud.log
+		fi
+	fi
+	if [ -e /tmp/owncloud.log ]; then
+		ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/owncloud.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/nginx/owncloud.html
+		rm -f /tmp/owncloud.log
+	fi
+	StatusLSB
+fi
+
+#### VSFTPd
+log_daemon_msg "HTML Convert of vsftpd.log"
+if [ -e /var/log/vsftpd.log.1 ]; then
+	cat /var/log/vsftpd.log.1 /var/log/vsftpd.log > /tmp/vsftpd.log
+else
+	if [ -e /var/log/vsftpd.log ]; then
+		cp /var/log/vsftpd.log /tmp/vsftpd.log
+	fi
+fi
+if [ -e /tmp/vsftpd.log ]; then
+	ccze -h -p vsftpd -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/vsftpd.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/system/vsftpd.html
+	rm -f /tmp/vsftpd.log
+fi
+StatusLSB
+
+#### IPtables
+log_daemon_msg "HTML Convert of IPtables log"
+if [ -e /var/log/iptables.log.1 ]; then
+	cat /var/log/iptables.log.1 /var/log/iptables.log > /tmp/iptables.log
+else
+	if [ -e /var/log/iptables.log ]; then
+		cp /var/log/iptables.log /tmp/iptables.log
+	fi
+fi
+if [ -e /tmp/iptables.log ]; then
+	ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/iptables.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/system/iptables.html
+	rm -f /tmp/iptables.log
+fi
+StatusLSB
+
+#### Syslog
+log_daemon_msg "HTML Convert of syslog"
+if [ -e /var/log/syslog.1 ]; then
+	cat /var/log/syslog.1 /var/log/syslog > /tmp/syslog
+else
+	if [ -e /var/log/syslog ]; then
+		cp /var/log/syslog /tmp/syslog
+	fi
+fi
+if [ -e /tmp/syslog ]; then
+	ccze -h -p syslog -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/syslog | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/system/syslog.html
+	rm -f /tmp/syslog
+fi
+StatusLSB
+
+#### Mail
+log_daemon_msg "HTML Convert of mail.log"
+if [ -e /var/log/mail.log.1 ]; then
+	cat /var/log/mail.log.1 /var/log/mail.log > /tmp/mail.log
+else
+	if [ -e /var/log/mail.log ]; then
+		cp /var/log/mail.log /tmp/mail.log
+	fi
+fi
+if [ -e /tmp/mail.log ]; then
+	ccze -h -p postfix -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/mail.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/system/mail.html
+	rm -f /tmp/mail.log
+fi
+StatusLSB
+
+#### PeerGuardian
+if [ "$MySB_PeerBlock" == "PeerGuardian" ]; then
+	log_daemon_msg "HTML Convert of pglcmd.log"
+	if [ -e /var/log/pgl/pglcmd.log.1 ]; then
+		cat /var/log/pgl/pglcmd.log.1 /var/log/pgl/pglcmd.log > /tmp/pglcmd.log
+	else
+		if [ -e /var/log/pgl/pglcmd.log ]; then
+			cp /var/log/pgl/pglcmd.log /tmp/pglcmd.log
+		fi
+	fi
+	if [ -e /tmp/pglcmd.log ]; then
+		ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/pglcmd.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/security/pglcmd.html
+		rm -f /tmp/pglcmd.log
+	fi
+	StatusLSB
+
+	log_daemon_msg "HTML Convert of pgld.log"
+	if [ -e /var/log/pgl/pgld.log.1 ]; then
+		cat /var/log/pgl/pgld.log.1 /var/log/pgl/pgld.log > /tmp/pgld.log
+	else
+		if [ -e /var/log/pgl/pgld.log ]; then
+			cp /var/log/pgl/pgld.log /tmp/pgld.log
+		fi
+	fi
+	if [ -e /tmp/pgld.log ]; then
+		ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/pgld.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/security/pgld.html
+		rm -f /tmp/pgld.log
+	fi
+	StatusLSB
+fi
+
+#### Fail2Ban
+if [ "$IsInstalled_Fail2Ban" == "YES" ]; then
+	log_daemon_msg "HTML Convert of Fail2ban log"
+	if [ -e /var/log/fail2ban.log.1 ]; then
+		cat /var/log/fail2ban.log.1 /var/log/fail2ban.log > /tmp/fail2ban.log
+	else
+		if [ -e /var/log/fail2ban.log ]; then
+			cp /var/log/fail2ban.log /tmp/fail2ban.log
+		fi
+	fi
+	if [ -e /tmp/fail2ban.log ]; then
+		ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/fail2ban.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/security/fail2ban.html
+		rm -f /tmp/fail2ban.log
+	fi
+	StatusLSB
+fi
+
+#### DNScrypt-proxy
+if [ "$IsInstalled_DNScrypt" == "YES" ]; then
+	log_daemon_msg "HTML Convert of DNScrypt-proxy log"
+	if [ -e /var/log/dnscrypt-proxy.log.1 ]; then
+		cat /var/log/dnscrypt-proxy.log.1 /var/log/dnscrypt-proxy.log > /tmp/dnscrypt-proxy.log
+	else
+		if [ -e /var/log/dnscrypt-proxy.log ]; then
+			cp /var/log/dnscrypt-proxy.log /tmp/dnscrypt-proxy.log
+		fi
+	fi
+	if [ -e /tmp/dnscrypt-proxy.log ]; then
+		ccze -h -o nolookups -o transparent -o cssfile="$MySB_InstallDir/web/public/themes/MySB/css/ccze.css" < /tmp/dnscrypt-proxy.log | sed -e '/DOCTYPE/d' -e '/html>/d' -e '/head>/d' -e '/<meta/d' -e '/<link/d' -e '/<title/d' -e '/body/d' > $MySB_InstallDir/web/logs/security/dnscrypt-proxy.html
+		rm -f /tmp/dnscrypt-proxy.log
+	fi
+	StatusLSB
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

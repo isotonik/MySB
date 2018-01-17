@@ -1,0 +1,101 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Install packages
+PackagesManage install "mysql-server"
+
+#### MySQL Secure
+if [ -z $MySQL_RootPassword ] && [ -z $MySQL_MysbPassword ]; then
+	MySQL_RootPassword="`GenPassword 16`"
+	MySQL_MysbPassword="`GenPassword 8`"
+
+	mysql -u root <<-EOF
+	UPDATE mysql.user SET Password=PASSWORD('$MySQL_RootPassword') WHERE User='root';
+	DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+	DELETE FROM mysql.user WHERE User='';
+	DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
+	create database MySB_db;
+	create user MySB_user;
+	grant all on MySB_db.* to 'MySB_user'@'localhost' identified by '$MySQL_MysbPassword';
+	FLUSH PRIVILEGES;
+	EOF
+
+	if [ ! -f /var/lib/mysql/ownCloud_db/db.opt ]; then
+		/usr/bin/mysql -u root -p$MySQL_RootPassword <<-EOF
+		create database ownCloud_db;
+		grant all on ownCloud_db.* to 'MySB_user'@'localhost' identified by '$MySQL_MysbPassword';
+		FLUSH PRIVILEGES;
+		EOF
+	fi
+
+	# Add MySQL password into MySB config files
+	echo "MySQL_RootPassword=\"$MySQL_RootPassword\"" >> $MySB_InstallDir/files/MySQL_RootPassword
+	echo "MySQL_MysbPassword=\"$MySQL_MysbPassword\"" >> $MySB_InstallDir/files/MySQL_MysbPassword
+	echo "MySQL_RootPassword=\"$MySQL_RootPassword\"" >> /etc/MySB/config_db
+	echo "MySQL_MysbPassword=\"$MySQL_MysbPassword\"" >> /etc/MySB/config_db
+	if [ ! -f /etc/MySB/config.php ]; then
+		cp -f $MySB_InstallDir/templates/etc.mysb.config.php.template /etc/MySB/config.php
+		perl -pi -e "s/<MySB_InstallDir>/$MySB_InstallDirEscaped/g" /etc/MySB/config.php
+		if [ ! -z "$MySQL_MysbPassword" ]; then
+			perl -pi -e "s/<MySQL_MysbPassword>/$MySQL_MysbPassword/g" /etc/MySB/config.php
+		fi
+	fi	
+
+	# Create MySQL client config file for MySB_user
+	echo "[client]" > /root/.config.cnf
+	echo "user = MySB_user" >> /root/.config.cnf
+	echo "password = $MySQL_MysbPassword" >> /root/.config.cnf
+	echo "host = localhost" >> /root/.config.cnf
+	chmod 0600 /root/.config.cnf
+
+	# Create MySB database (ONLY during a new install, NOT during an upgrade)
+	if [ "$1" == "INSTALL" ]; then
+		mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Schema_2015-09-30.sql
+		mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Data_2015-09-30.sql
+	fi
+fi
+
+if [ "$1" == "UPGRADE" ] && [ -s $MySB_DB ] && CheckCommand 0 mysql; then
+	sqlite3 $MySB_DB .dump | grep '^INSERT INTO' > $MySB_DB.dump
+	cat $MySB_DB.dump
+	cat $MySB_DB.dump | python $MySB_InstallDir/scripts/SQLiteToMySQL.py > $MySB_InstallDir/db/MySB_MySQL.sql
+	perl -pi -e "s/NULL/''/g" $MySB_InstallDir/db/MySB_MySQL.sql
+	perl -pi -e "s/' '/''/g" $MySB_InstallDir/db/MySB_MySQL.sql
+	cat $MySB_InstallDir/db/MySB_MySQL.sql
+	mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Schema_2015-09-30.sql
+	mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/db/MySB_MySQL.sql
+	if [ -f $MySB_DB.dump ]; then rm -vf $MySB_DB.dump; fi
+	if [ -f $MySB_InstallDir/db/MySB_MySQL.sql ]; then rm -vf $MySB_InstallDir/db/MySB_MySQL.sql; fi
+	if [ -f $MySB_DB ]; then mv -vf $MySB_DB $MySB_DB.old; fi
+fi
+
+#### START services
+ManageServices start "mysql"
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

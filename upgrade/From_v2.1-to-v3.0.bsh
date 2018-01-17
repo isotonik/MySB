@@ -1,0 +1,397 @@
+#!/bin/bash
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_before
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Count steps
+echo
+CurrentSTEP=0
+TotalSTEP=32
+
+if [ "$BANNER" == "ON" ]; then
+	BannerGenerator
+fi
+echo
+echo -e "$Upgrade_Banner"
+echo
+
+#### SQLite
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_SqliteUpdateDatabase$CEND..."
+screen -dmS SQLite /bin/bash $MySB_InstallDir/install/SQLite 'UPGRADE';
+WaitingScreen SQLite
+StatusSTD
+
+#### Questions
+ScriptInvoke "source" "$MySB_InstallDir/install/Questions" "$$" "UPGRADE" "$MySB_InstallDir"
+#### Questions
+
+echo
+
+#### Vars
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_ReadingDatabaseInfos$CEND..."
+if [ -f $MySB_InstallDir/inc/vars ]; then source $MySB_InstallDir/inc/vars; fi
+ListingUsers
+StatusSTD
+
+#### Upgrade in progress page
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_ActivatingProgressPage$CEND..."
+UpgradeInProgress "on"
+StatusSTD
+
+#### Stopping CRON and rTorrent sessions
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_StoppingCronAndRtorrent$CEND..."
+service cron stop &> /dev/null
+RtorrentSeesions="`ls -1r /etc/init.d/rtorrent-* | cut -d '/' -f 4`"
+for Session in $RtorrentSeesions; do
+	service $Session stop &> /dev/null
+done
+StatusSTD
+
+#### Switching DNS
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_SwitchingDNS$CEND..."
+SwitchDNS "standard"
+StatusSTD
+
+#### Forcing NTP update
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_UpdatingClock$CEND..."
+ping -c4 0.fr.pool.ntp.org > /dev/null 2>&1
+/usr/sbin/ntpdate -u 0.fr.pool.ntp.org > /dev/null 2>&1
+StatusSTD
+
+#### Move some files & directories
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_MoveAndDelete$CEND..."
+# Temp Directory
+if [ -d $MySB_InstallDir/temp ]; then rm -rf $MySB_InstallDir/temp/* &> /dev/null; fi
+# MySB PHP config file
+if [ -f /etc/MySB/config.php ]; then rm -f /etc/MySB/config.php &> /dev/null; fi
+# NginX
+if [ -f /etc/nginx/nginx.conf.dpkg-dist ]; then rm -f /etc/nginx/nginx.conf.dpkg-dist &> /dev/null; fi
+if [ -f /etc/nginx/sites-available/default.dpkg-dist ]; then rm -f /etc/nginx/sites-available/default.dpkg-dist &> /dev/null; fi
+if [ -f /etc/logrotate.d/nginx.dpkg-dist ]; then mv /etc/logrotate.d/nginx.dpkg-dist /etc/logrotate.d/nginx &> /dev/null; fi
+if [ -f /etc/nginx/fastcgi.conf ]; then rm -f /etc/nginx/fastcgi.conf &> /dev/null; fi
+# Bind
+if [ -f /etc/default/bind9.dpkg-dist ]; then rm -f /etc/default/bind9.dpkg-dist &> /dev/null; fi
+# PlexMedia Server
+if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -f /etc/init.d/plexmediaserver.dpkg-bak &> /dev/null; fi
+# Resolv.conf
+if [ -f /etc/resolv.conf.back ]; then rm -f /etc/resolv.conf.back &> /dev/null; fi
+# Sources Directory
+if [ -d $MySB_InstallDir/sources ]; then rm -rf $MySB_InstallDir/sources/* &> /dev/null; fi
+# rtorrent
+if [ -f /home/*/.rtorrent.rc.bckp_v1.0_to_v1.1 ]; then rm -f /home/*/.rtorrent.rc.bckp_v1.0_to_v1.1 &> /dev/null; fi
+if [ -f /home/*/.rtorrent.rc.bckp_v1.1_to_v2.0 ]; then rm -f /home/*/.rtorrent.rc.bckp_v1.1_to_v2.0 &> /dev/null; fi
+# Seedbox-Manager
+if [ "$IsInstalled_Manager" == "YES" ]; then
+	if [ -d $ManagerDir/conf ]; then
+		mv $ManagerDir/conf $MySB_InstallDir/temp/sm_conf &> /dev/null
+		rm -rf $ManagerDir &> /dev/null
+	fi
+fi
+StatusSTD
+
+#### Packages
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_AllNeededPackages$CEND..."
+screen -dmS Packages /bin/bash $MySB_InstallDir/install/Packages 'UPGRADE';
+WaitingScreen Packages
+StatusSTD
+
+#### SourcesList
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_UpdateDebianSources$CEND..."
+screen -dmS SourcesList /bin/bash $MySB_InstallDir/install/SourcesList 'UPGRADE';
+WaitingScreen SourcesList
+StatusSTD
+
+#### MySQL
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_MySQL$CEND..."
+screen -dmS MySQL /bin/bash $MySB_InstallDir/install/MySQL 'UPGRADE';
+WaitingScreen MySQL
+StatusSTD
+
+#### DownloadAll
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_DownloadAll$CEND..."
+screen -dmS DownloadAll /bin/bash $MySB_InstallDir/install/DownloadAll 'UPGRADE';
+WaitingScreen DownloadAll
+StatusSTD
+
+######################################################################
+
+#### IPtables logging
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_IptablesLogging$CEND..."
+if [ -f /etc/rsyslog.d/iptables.conf ]; then rm -f /etc/rsyslog.d/iptables.conf; fi
+echo ":msg, contains, \"[netfilter] \"  -/var/log/iptables.log" > /etc/rsyslog.d/iptables.conf
+echo "& ~" >> /etc/rsyslog.d/iptables.conf
+if [ ! -f /var/log/iptables.log ]; then touch /var/log/iptables.log; fi
+cp $MySB_InstallDir/templates/etc.logrotate.d.iptables.template /etc/logrotate.d/iptables
+chmod 0644 /etc/logrotate.d/iptables
+service rsyslog restart &> /dev/null
+logrotate -f /etc/logrotate.d/iptables &> /dev/null
+cp -f $MySB_InstallDir/templates/etc.pgl.pglcmd.conf.template /etc/pgl/pglcmd.conf
+StatusSTD
+
+#### Getting information about OVH monitoring engine
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_ProviderInfos$CEND..."
+if [ "$ServerProvider" == "OVH" ] || [ "$ServerProvider" == "ONLINE" ]; then
+	screen -dmS Monitoring /bin/bash $MySB_InstallDir/install/Monitoring 'UPGRADE';
+	WaitingScreen Monitoring
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### NginX
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_NginX$CEND..."
+screen -dmS Nginx /bin/bash $MySB_InstallDir/install/Nginx 'UPGRADE';
+WaitingScreen Nginx
+StatusSTD
+
+### DNScrypt-proxy
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_DNScrypt$CEND..."
+if [ "$ToInstall_DNScrypt" == "YES" ] || [ "$IsInstalled_DNScrypt" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '1'" "serv_name = 'DNScrypt-proxy'"
+	screen -dmS DNScrypt /bin/bash $MySB_InstallDir/install/DNScrypt 'UPGRADE';
+	WaitingScreen DNScrypt
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### Fail2Ban
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_Fail2Ban$CEND..."
+if [ "$ToInstall_Fail2Ban" == "YES" ] || [ "$IsInstalled_Fail2Ban" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '1'" "serv_name = 'Fail2Ban'"
+	screen -dmS Fail2Ban /bin/bash $MySB_InstallDir/install/Fail2Ban 'UPGRADE';
+	WaitingScreen Fail2Ban
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### PHP
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_PHP$CEND..."
+screen -dmS PHP /bin/bash $MySB_InstallDir/install/PHP 'UPGRADE';
+WaitingScreen PHP
+StatusSTD
+
+#### RKHunter
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_RKhunter$CEND..."
+screen -dmS RKHunter /bin/bash $MySB_InstallDir/install/RKHunter 'UPGRADE';
+WaitingScreen RKHunter
+StatusSTD
+
+#### OpenVPN
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_OpenVPN$CEND..."
+if [ "$ToInstall_OpenVPN" == "YES" ]; then
+	screen -dmS OpenVPN /bin/bash $MySB_InstallDir/install/OpenVPN 'server' 'UPGRADE';
+	WaitingScreen OpenVPN
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### NFS
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_NFS$CEND..."
+if [ "$IsInstalled_NFS" == "YES" ]; then
+	for seedUser in $UsersList; do
+		sed -i '/'$seedUser'/d' /etc/exports
+		uid=`grep $seedUser /etc/passwd | awk -F: '{ print $3 }'`
+		guid=`grep MySB_users /etc/group | awk -F: '{ print $3 }'`
+		echo "/home/$seedUser/rtorrent 10.0.0.0/255.255.255.0(ro,anonuid=$uid,async,anongid=$guid,insecure,no_subtree_check,fsid=0,crossmnt) 10.0.1.0/255.255.255.0(ro,anonuid=$uid,async,anongid=$guid,insecure,no_subtree_check,nohide,fsid=0,crossmnt) 10.0.2.0/255.255.255.0(ro,anonuid=$uid,async,anongid=$guid,insecure,no_subtree_check,nohide,fsid=0,crossmnt)" >> /etc/exports		
+	done
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+### PlexMedia
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_PlexMedia$CEND..."
+if [ "$ToInstall_PlexMedia" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '1'" "serv_name = 'Plex Media Server'"
+	screen -dmS PlexMedia /bin/bash $MySB_InstallDir/install/PlexMedia 'UPGRADE';
+	WaitingScreen PlexMedia
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### Samba
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_Samba$CEND..."
+if [ "$ToInstall_OpenVPN" == "YES" ] || [ "$IsInstalled_OpenVPN" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '1'" "serv_name = 'Samba'"
+	screen -dmS Samba /bin/bash $MySB_InstallDir/install/Samba 'UPGRADE';
+	WaitingScreen Samba
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### ownCloud
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_ownCloud$CEND..."
+if [ "$ToInstall_ownCloud" == "YES" ] || [ "$IsInstalled_ownCloud" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '1'" "serv_name = 'ownCloud'"
+	screen -dmS ownCloud /bin/bash $MySB_InstallDir/install/ownCloud 'UPGRADE';
+	WaitingScreen ownCloud
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+#### Webmin
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_Webmin$CEND..."
+if [ "$ToInstall_Webmin" == "YES" ]; then
+	screen -dmS Webmin /bin/bash $MySB_InstallDir/install/Webmin 'UPGRADE';
+	WaitingScreen Webmin
+	StatusSTD
+else
+	echo -e "$Upgrade_NothingToDo"
+fi
+
+######################################################################
+
+#### Refresh tools
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_RefreshMe$CEND..."
+screen -dmS MySB_RefreshMe /bin/bash $MySB_InstallDir/bin/MySB_RefreshMe "$Global_ALL" 'UPGRADE';
+# Seedbox-Manager
+if [ "$IsInstalled_Manager" == "YES" ]; then
+	if [ -d $MySB_InstallDir/temp/sm_conf ]; then
+		mv $MySB_InstallDir/temp/sm_conf $ManagerDir/conf &> /dev/null
+	fi
+fi
+WaitingScreen MySB_RefreshMe
+StatusSTD
+
+#### Cron
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_Cron$CEND..."
+screen -dmS Cron /bin/bash $MySB_InstallDir/install/Cron 'UPGRADE';
+WaitingScreen Cron
+StatusSTD
+
+#### Cleaning
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_Cleaning$CEND..."
+rm -rf $MySB_InstallDir/temp/* &> /dev/null
+Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "rtorrent_version = 'v0.9.6'" "rtorrent_version = 'v0.9.4'"
+StatusSTD
+
+#### Create missing directories and change rights
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Global_OwnerAndRights$CEND..."
+ManageDirectoriesAndFiles
+StatusSTD
+
+#### STOP & START services
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_RestartServices$CEND..."
+ManageServices stop "stunnel4 postfix" &> /dev/null
+ManageServices start "cron stunnel4 postfix samba nginx bind9 dnscrypt-proxy" &> /dev/null
+StatusSTD
+
+#### Security rules
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Global_FinalSecurityRules$CEND..."
+screen -dmS MySB_SecurityRules /bin/bash $MySB_InstallDir/bin/MySB_SecurityRules 'create' 'UPGRADE';
+WaitingScreen MySB_SecurityRules
+StatusSTD
+
+#### Send mail for each user with new version
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_SendMail$CEND..."
+if [ -f $MySB_InstallDir/inc/vars ]; then source $MySB_InstallDir/inc/vars; fi
+MainUserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "admin = '1'"`"
+RutorrentDirEscaped="`echo $RutorrentDir | sed s,/,\\\\\\\\\\/,g`"
+# Add last time check for users addresses
+Func_SQL_Command 'UPDATE' 'MySB_db' 'users_addresses' "last_update = 'NOW'" "last_update = '0000-00-00 00:00:00'"
+ListingUsers
+for seedUser in $UsersList; do
+	UserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$seedUser'"`"
+	UserPassword="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_passwd' 'users' "users_ident = '$seedUser'"`"
+
+	# New rTorrent Cron
+	crontab -l > /tmp/crontab.tmp
+	sed -i "/rtorrent-$seedUser/d" /tmp/crontab.tmp
+	echo "*/5 * * * * if ! ( /bin/ps U $seedUser | grep 'rtorrent' > /dev/null ); then service rtorrent-$seedUser restart > /dev/null 2>&1; fi" >> /tmp/crontab.tmp
+	crontab /tmp/crontab.tmp
+	rm -f /tmp/crontab.tmp
+
+	# New rTorrent init
+	cp $MySB_InstallDir/templates/etc.init.rtorrent.template /etc/init.d/rtorrent-$seedUser
+	perl -pi -e "s/<InstallDir>/$MySB_InstallDirEscaped/g" /etc/init.d/rtorrent-$seedUser
+	perl -pi -e "s/<username>/$seedUser/g" /etc/init.d/rtorrent-$seedUser
+	perl -pi -e "s/<rutorrent_dir>/$RutorrentDirEscaped/g" /etc/init.d/rtorrent-$seedUser
+	chmod +x /etc/init.d/rtorrent-$seedUser	
+
+	if [ "$UserId" == "$MainUserId" ] && [ ! -z "$UserPassword" ]; then
+		# Remove main user password from database
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "users_passwd = ''" "admin = '1'"
+		ScriptInvoke "screen" "$MySB_InstallDir/bin/MySB_ChangeUserPassword" "$seedUser" "$UserPassword" "UPGRADE"
+	else
+		# Init password required
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "init_password = '1'" "users_ident = '$seedUser'"
+		Subject="$Upgrade_SubjectUpgraded $MySB_CurrentVersion"
+		Case="upgrade"
+		SendMail "$Subject" "$seedUser" "$Case"
+	fi
+done
+StatusSTD
+
+#### Upgrade in progress page
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $Upgrade_DisablingProgressPage$CEND..."
+UpgradeInProgress "off" &> /dev/null
+StatusSTD
+
+clear
+echo -e "$Upgrade_UpgradeFinished"
+echo
+QuestionGetString NO "$Upgrade_RebootNow" REBOOT $Global_YES
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

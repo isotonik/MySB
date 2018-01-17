@@ -1,0 +1,175 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$ToInstall_ownCloud" == "YES" ]; then
+	#### VARs
+	ownCloudDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ownCloud'"`"
+	ownCloudVersion="`Func_SQL_Command 'SELECT' 'MySB_db' 'version' 'repositories' "name = 'ownCloud'"`"
+	TimeZoneEscaped="`echo $TimeZone | sed s,/,\\\\\\\\\\/,g`"
+	TimeStamp=$(date +%s)
+	MailFrom="`echo $MainUserEmail | cut -d "@" -f 1`"
+	MailDomain="`echo $MainUserEmail | cut -d "@" -f 2`"
+
+	#### NginX configuration
+	cp -vf $MySB_InstallDir/templates/etc.nginx.locations.owncloud.conf.template /etc/nginx/locations/ownCloud.conf
+	perl -pi -e "s/<MySB_InstallDir>/$MySB_InstallDirEscaped/g" /etc/nginx/locations/ownCloud.conf
+	chmod 0644 /etc/nginx/locations/ownCloud.conf
+	# To install ownCloud allows the generation of a ownCloud configuration file and obtain the valeures 'InstanceId', 'PasswordSalt' and 'Secret'.
+	cp -vf $MySB_InstallDir/templates/etc.nginx.locations.owncloud.local.template /etc/nginx/locations/ownCloud.local
+	perl -pi -e "s/<MySB_InstallDir>/$MySB_InstallDirEscaped/g" /etc/nginx/locations/ownCloud.local
+	chmod 0644 /etc/nginx/locations/ownCloud.local
+
+	#### PHP
+	perl -pi -e "s/post_max_size = 10M/post_max_size = 20G/g" /etc/php5/fpm/php.ini
+	perl -pi -e "s/upload_max_filesize = 10M/upload_max_filesize = 20G/g" /etc/php5/fpm/php.ini
+	perl -pi -e "s/max_file_uploads = 20/max_file_uploads = 20000/g" /etc/php5/fpm/php.ini
+	perl -pi -e "s/output_buffering = 4096/output_buffering = Off/g" /etc/php5/fpm/php.ini
+	echo "apc.enable_cli=1" >> /etc/php5/cli/conf.d/20-apcu.ini
+	perl -pi -e "s/^;env\[PATH\]/env\[PATH\]/g" /etc/php5/fpm/pool.d/www.conf
+
+	#### ownCloud Core
+	if [ "$1" == "UPGRADE" ] || [ ! -d $ownCloudDir ]; then
+		ownCloudUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ownCloud'"`"
+		ownCloudFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ownCloud'"`"
+		if [ -d $ownCloudDir ]; then
+			rm -vrf $ownCloudDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$ownCloudFile ]; then
+			wget --no-check-certificate $ownCloudUrl -O $MySB_InstallDir/files/$ownCloudFile
+		fi
+		unzip $MySB_InstallDir/files/$ownCloudFile -d $MySB_InstallDir/temp/
+		SubDirownCloud="`unzip -l $MySB_InstallDir/files/$ownCloudFile | awk '{ print $4 }' | cut -d '/' -f 1 | uniq | sed '1,3d;$d'`"
+		if [ -d $MySB_InstallDir/temp/$SubDirownCloud ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirownCloud $ownCloudDir
+		fi
+	fi
+
+	#### CRON
+	crontab -u www-data -l > /tmp/crontab.tmp
+	sed -i '/ownCloud/d' /tmp/crontab.tmp
+	echo "*/15  *  *  *  * php -f $ownCloudDir/cron.php > /dev/null 2>&1 # ownCloud" | tee -a /tmp/crontab.tmp
+	crontab -u www-data /tmp/crontab.tmp
+	rm -f /tmp/crontab.tmp
+
+	#### MySQL
+	IfEmpty="`ls -a /var/lib/mysql/ownCloud_db/ 2> /dev/null | sed -e "/\.$/d" | wc -l`"
+	if [ $IfEmpty -eq 1 ]; then
+		/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=ownCloud_db < $MySB_InstallDir/templates/Dump_MySQL_ownCloud_db_2015-09-17.sql
+		/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=ownCloud_db -e "UPDATE oc_preferences SET configvalue = '$TimeZone' WHERE configkey = 'timezone'";
+	fi
+
+	#### Create directories & change rights
+	if [ ! -d $ownCloudDir/data ]; then
+		mkdir $ownCloudDir/data
+	fi
+	ManageDirectoriesAndFiles
+
+	#### START services
+	ManageServices start "php5-fpm nginx cron"
+
+	#### ownCloud config file
+	source /etc/MySB/config_db
+	curl --user $MySB_User:$MySB_Password --data "adminlogin=admin&adminpass=admin&directory=/home/owncloud&dbtype=mysql&dbuser=MySB_user&dbpass=$MySQL_MysbPassword&dbname=ownCloud_db&dbhost=localhost" "http://127.0.0.1:$Port_HTTP/owncloud/" &> /dev/null
+	sleep 5
+	if [ -f $ownCloudDir/config/config.php ]; then
+		if [ -f /etc/nginx/locations/ownCloud.local ]; then
+			rm -vf /etc/nginx/locations/ownCloud.local
+		fi
+		InstanceId="`cat $ownCloudDir/config/config.php | grep 'instanceid' | awk '{ print $3 }'| cut -d "'" -f 2`"
+		InstanceId="`echo $InstanceId | sed s,/,\\\\\\\\\\/,g`"
+		PasswordSalt="`cat $ownCloudDir/config/config.php | grep 'passwordsalt' | awk '{ print $3 }'| cut -d "'" -f 2`"
+		PasswordSalt="`echo $PasswordSalt | sed s,/,\\\\\\\\\\/,g`"
+		Secret="`cat $ownCloudDir/config/config.php | grep 'secret' | awk '{ print $3 }'| cut -d "'" -f 2`"
+		Secret="`echo $Secret | sed s,/,\\\\\\\\\\/,g`"
+	fi
+	if [ -z "$InstanceId" ]; then
+		InstanceId="oc7yb4yj6xgr"
+	fi
+	if [ -z "$PasswordSalt" ]; then
+		PasswordSalt="6XwLz3yYlVlEIlFd0zHPPBF32X3xKM"
+	fi
+	if [ -z "$Secret" ]; then
+		Secret="iIrWBM79glEVZbxuVEFdPML29+axTxgTgPcOyI7wwVgEn9Nu"
+	fi
+	cp -vf $MySB_InstallDir/templates/owncloud.config.php.template $ownCloudDir/config/config.php
+	perl -pi -e "s/<InstanceId>/$InstanceId/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<PasswordSalt>/$PasswordSalt/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<Secret>/$Secret/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<server_name>/$HostNameFQDN/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<PORT_HTTPS>/$Port_HTTPS/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<Version>/$ownCloudVersion/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<MySB_DB_User>/MySB_user/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<MySB_DB_Pass>/$MySQL_MysbPassword/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<TimeZone>/$TimeZoneEscaped/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<mail_from_address>/$MailFrom/g" $ownCloudDir/config/config.php
+	perl -pi -e "s/<mail_domain>/$MailDomain/g" $ownCloudDir/config/config.php
+	sed -i "s/'default_language' => 'en'/'default_language' => '$EnvLang'/g;" $ownCloudDir/config/config.php
+	chown www-data:www-data $ownCloudDir/config/config.php
+	chmod 0640 $ownCloudDir/config/config.php
+
+	#### External Storage (mount.json)
+	IdStorage=$(Func_SQL_Command 'SELECT' 'ownCloud_db' 'numeric_id' 'oc_storages' "id = 'local::/home/\$user/'")
+	cp -vf $MySB_InstallDir/templates/home.owncloud.mount.json.template /home/owncloud/mount.json
+	perl -pi -e "s/<IdStorage>/$IdStorage/g" /home/owncloud/mount.json
+
+	#### Manage Admin user
+	su -s /bin/sh www-data -c "/usr/bin/php $ownCloudDir/occ upgrade"
+	OC_PASS=$MySQL_MysbPassword
+	export OC_PASS
+	su -s /bin/sh www-data -c "/usr/bin/php $ownCloudDir/occ user:resetpassword --password-from-env admin"
+	su -s /bin/sh www-data -c "/usr/bin/php $ownCloudDir/occ app:enable files_external"
+
+	#### Create all existing MySB users
+	if [ "$1" == "UPGRADE" ] && [ -d $ownCloudDir ]; then
+		ListingUsers
+		for seedUser in $UsersList; do
+			UserExist="`Func_SQL_Command 'SELECT' 'ownCloud_db' 'uid' 'oc_users' "uid='$seedUser'"`"
+
+			if [ -z $UserExist ]; then
+				FnUserMail="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_email' 'users' "users_ident = '$seedUser'"`"
+				OC_PASS="`GenPassword 8`"
+				export OC_PASS
+				su -s /bin/sh www-data -c "/usr/bin/php $ownCloudDir/occ user:add --password-from-env --display-name=\"$seedUser\" --group=\"MySB_users\" $seedUser" &> /dev/null
+				Func_ownCloud_DB "CreateUser" "$seedUser" "$FnUserMail" "$EnvLang"
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "init_password = '1'" "users_ident = '$seedUser'"
+			fi
+			unset UserExist
+		done
+	fi
+
+	#### Logrotate
+	cp -vf $MySB_InstallDir/templates/etc.logrotate.d.owncloud.template /etc/logrotate.d/owncloud
+	logrotate -f /etc/logrotate.d/owncloud
+
+	if CheckCommand 0 $ownCloudDir/occ; then
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '0', is_installed = '1'" "serv_name = 'ownCloud'"
+	fi
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

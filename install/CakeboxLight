@@ -1,0 +1,122 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___        
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_       
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_      
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__     
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_    
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_   
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_  
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__ 
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$USAGE" == "ON" ]; then
+	if [ "`screen -ls | grep SeedboxManager`" == "" ]; then
+		if [ "$IsInstalled_Cakebox" == "NO" ]; then
+			echo
+			echo -e "${CYELLOW}CakeBox Light is not installed!$CEND"
+			QuestionGetString NO  "Install CakeBox Light? " ToInstall_Cakebox $ToInstall_Cakebox
+
+			Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '$(echo $ToInstall_Cakebox | sed 's/NO/0/g;' | sed 's/YES/1/g;')'" "serv_name = 'CakeBox-Light'"
+		fi
+	fi
+fi
+
+if [ "$ToInstall_Cakebox" == "YES" ]; then
+	#### app
+	CakeboxUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Cakebox-Light'"`"
+	if [ -d $CakeboxDir ]; then
+		cd $CakeboxDir/
+		git stash
+		git pull
+	else
+		git clone $CakeboxUrl $CakeboxDir
+	fi
+	cd $CakeboxDir
+	composer install
+	bower update --allow-root --config.interactive=false	
+	
+	#### Plugin ruTorrent
+	PluginCakeboxDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Link Cakebox'"`"
+	PluginCakeboxUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Link Cakebox'"`"	
+	if [ -d $PluginCakeboxDir ]; then
+		cd $PluginCakeboxDir
+		git stash
+		git pull
+	else
+		git clone $PluginCakeboxUrl $PluginCakeboxDir
+	fi
+	chown -R www-data:www-data $PluginCakeboxDir
+	sed -i "s/'http:\/\/'.\$host;/'https:\/\/$HostNameFQDN:$Port_HTTPS\/cb\/';/g;" $PluginCakeboxDir/conf.php
+	sed -i "s/torrents/rtorrent/g;" $PluginCakeboxDir/conf.php
+
+	#### NginX (alias with proxy)
+	CakeboxDirEscaped=`echo $CakeboxDir | sed s,/,\\\\\\\\\\/,g`
+	if [ -h /etc/nginx/sites-enabled/cakebox ]; then rm -vf /etc/nginx/sites-enabled/cakebox; fi
+	cp -vf $MySB_InstallDir/templates/etc.nginx.site-enabled.cakebox.template /etc/nginx/sites-available/cakebox
+	perl -pi -e "s/<server_name>/$HostNameFQDN/g" /etc/nginx/sites-available/cakebox
+	perl -pi -e "s/<cakebox_rootdir>/$CakeboxDirEscaped/g" /etc/nginx/sites-available/cakebox
+	cp -vf $MySB_InstallDir/templates/etc.nginx.locations.cakebox.conf.template /etc/nginx/locations/Cakebox-Light.conf
+	if [ ! -h /etc/nginx/sites-enabled/cakebox ]; then ln -s /etc/nginx/sites-available/cakebox /etc/nginx/sites-enabled/cakebox; fi
+	perl -pi -e "s/<cakebox_rootdir>/$CakeboxDirEscaped/g" /etc/nginx/locations/Cakebox-Light.conf
+	chmod 0644 /etc/nginx/locations/Cakebox-Light.conf
+
+	# Create proxy file
+	cp -vf $MySB_InstallDir/templates/etc.nginx.proxy.Cakebox-Light.conf.template /etc/nginx/proxy/Cakebox-Light.conf
+
+	ListingUsers
+	for seedUser in $UsersList; do
+		cp -vf $MySB_InstallDir/templates/etc.nginx.rpc.user.cakebox.template /etc/nginx/rpc/$seedUser.cakebox
+		perl -pi -e "s/<username>/$seedUser/g" /etc/nginx/rpc/$seedUser.cakebox
+		#### Change language
+		case "$EnvLang" in
+			"fr")
+				perl -pi -e "s/\"en\"/\"$EnvLang\"/g" $CakeboxDir/config/$seedUser.php
+			;;
+			"en")
+				perl -pi -e "s/\"fr\"/\"$EnvLang\"/g" $CakeboxDir/config/$seedUser.php
+			;;
+		esac
+		chown root:www-data $CakeboxDir/config/$seedUser.php
+		chmod 0660 $CakeboxDir/config/$seedUser.php		
+	done
+
+	#### Delete unused files and directories
+	if [ -d $CakeboxDir/webconf-example ]; then rm -rf $CakeboxDir/webconf-example; fi
+	if [ -d $CakeboxDir/scripts ]; then rm -rf $CakeboxDir/scripts; fi
+
+	#### Some modifications
+	if [ -f $CakeboxDir/public/app/directive/webplayer.js ]; then
+		sed -i "/location.host/s/+ data.url/+ \":$Port_HTTPS\" + data.url/g" $CakeboxDir/public/app/directive/webplayer.js
+	fi
+	if [ -f $CakeboxDir/public/app/controller/AppCtrl.js ]; then
+		sed -i "/location.host/s/+ data.access/+ \":$Port_HTTPS\" + data.access/g" $CakeboxDir/public/app/controller/AppCtrl.js
+	fi
+
+	#### Create directories & change rights
+	ManageDirectoriesAndFiles
+
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '0', is_installed = '1'" "serv_name = 'CakeBox-Light'"
+
+	#### START services
+	ManageServices start "nginx"
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

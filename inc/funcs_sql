@@ -1,0 +1,166 @@
+#!/bin/bash
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### ownCloud
+Func_ownCloud_DB() {
+	Type="$1"
+	Tables="$2"
+	Columns="$3"
+	Values="$3"
+
+	case "$Type" in
+		"CreateUser")
+			User="$2"
+			Mail="$3"
+			Lang="$4"
+			TimeStamp=$(date +%s)
+
+			/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=ownCloud_db <<-EOF
+			INSERT INTO oc_preferences (userid, appid, configkey, configvalue) VALUES('admin', 'files_external', '/Home_$User', '$TimeStamp');
+			INSERT INTO oc_preferences (userid, appid, configkey, configvalue) VALUES('$User', 'core', 'lang', '$Lang');
+			INSERT INTO oc_preferences (userid, appid, configkey, configvalue) VALUES('$User', 'settings', 'email', '$Mail');
+			INSERT INTO oc_storages (id) VALUES('local::/home/$User/');
+			EOF
+		;;
+		"DeleteUser")
+			User="$2"
+
+			/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=ownCloud_db <<-EOF
+			DELETE FROM oc_storages WHERE id = 'local::/home/$User';
+			DELETE FROM oc_preferences WHERE configkey = '/Home_$User';
+			EOF
+		;;
+		"INSERT")
+			/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=ownCloud_db -e "INSERT INTO $Tables ($Columns) VALUES ($Values)";
+		;;
+	esac
+}
+
+Func_SQL_Command() {
+	DatabaseType="mysql"
+	Command="$1"
+	DataBase="$2"
+	AptDate="`date +%Y-%m-%d\ %H:%M:%S`"	
+
+	# MySQL or SQLite ?
+	case "$DataBase" in
+		"MySB_db")
+			# <= 1
+			if [ "`ls -a /var/lib/mysql/MySB_db/ 2> /dev/null | sed -e "/\.$/d" | wc -l`" -le 1 ] && [ -f $MySB_InstallDir"/db/MySB.sq3" ]; then
+				DatabaseType="sqlite3"
+				DataBase=$MySB_DB
+			fi
+		;;
+		"Wolf_db")
+			DatabaseType="sqlite3"
+			DataBase=$Wolf_DB
+		;;
+	esac
+
+	case "$Command" in
+		"UPDATE")
+			Table="$3"
+			VarSet="`echo $4 | sed "s/NOW/$AptDate/g;"`"
+			VarWhere="$5"
+			Display="$6"
+			case "$DatabaseType" in
+				"sqlite3")
+					/usr/bin/sqlite3 $Display -cmd '.timeout 150000' $DataBase "UPDATE $Table SET $VarSet WHERE $VarWhere;"
+				;;
+				"mysql")
+					if [ "$Display" == "-echo" ];then
+						echo "UPDATE $Table SET $VarSet WHERE $VarWhere"
+					fi				
+					/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -e "UPDATE $Table SET $VarSet WHERE $VarWhere";
+				;;
+			esac
+		;;
+		"INSERT")
+			Table="$3"
+			VarColumns="$4"
+			VarValues="`echo $5 | sed "s/NOW/$AptDate/g;"`"
+			case "$DatabaseType" in
+				"sqlite3")
+					/usr/bin/sqlite3 -cmd '.timeout 150000' $DataBase "INSERT INTO $Table ($VarColumns) VALUES ($VarValues);"
+				;;
+				"mysql")
+					/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -e "INSERT INTO $Table ($VarColumns) VALUES ($VarValues)";
+				;;
+			esac
+		;;
+		"DELETE")
+			Table="$3"
+			VarWhere="$4"
+			Display="$5"
+			case "$DatabaseType" in
+				"sqlite3")			
+					/usr/bin/sqlite3 $Display -cmd '.timeout 150000' $DataBase "DELETE FROM $Table WHERE $VarWhere"
+				;;
+				"mysql")
+					if [ "$Display" == "-echo" ];then
+						echo "DELETE FROM $Table WHERE $VarWhere"
+					fi
+					/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -e "DELETE FROM $Table WHERE $VarWhere";
+				;;
+			esac
+		;;
+		"SELECT")
+			VarSelect="$3"
+			Table="$4"
+			VarWhere="$5"
+			case "$DatabaseType" in
+				"sqlite3")
+					case "$VarSelect" in
+						"count(*)")
+							/usr/bin/sqlite3 -cmd '.timeout 150000' $DataBase "SELECT $VarSelect FROM $Table;"
+						;;
+						*)
+							/usr/bin/sqlite3 -cmd '.timeout 150000' $DataBase "SELECT $VarSelect FROM $Table WHERE $VarWhere;"
+						;;
+					esac
+				;;
+				"mysql")
+					case "$VarSelect" in
+						min*|max*)
+							Value="`/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -N -s -e \"SELECT $VarSelect FROM $Table WHERE $VarWhere\";`"
+							if [ "$Value" == "NULL" ]; then
+								echo 0
+							else
+								echo $Value
+							fi
+						;;
+						"count(*)")
+							/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -N -s -e "SELECT $VarSelect FROM $Table";
+						;;
+						*)
+							/usr/bin/mysql --defaults-extra-file=/root/.config.cnf --database=$DataBase -N -s -e "SELECT $VarSelect FROM $Table WHERE $VarWhere" | sed 's/\t/|/g;';
+						;;
+					esac
+				;;
+			esac
+		;;
+	esac
+}
+
+##################### LAST LINE ######################################

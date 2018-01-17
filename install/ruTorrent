@@ -1,0 +1,458 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### STOP services
+ManageServices stop "cron"
+ListingUsers
+for seedUser in $UsersList; do
+	service rtorrent-$seedUser status &> /dev/null
+	if [ $? -eq 0 ]; then
+		service rtorrent-$seedUser stop
+	fi
+done
+
+#### ruTorrent + Official Plugins
+echo
+echo "########## ruTorrent + Official Plugins"
+echo
+RutorrentUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent'"`"
+if [ -d $RutorrentDir ]; then
+	cd $RutorrentDir/
+	git stash
+	git pull
+else
+	git clone $RutorrentUrl $RutorrentDir
+	cd $RutorrentDir
+fi
+
+#### Plugin Chat
+echo
+echo "########## Plugin Chat"
+echo
+PluginChatActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Chat'"`"
+PluginChatDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Chat'"`"
+if [ "$PluginChatActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginChatDir ]; then
+		PluginChatUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Chat'"`"
+		PluginChatFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin Chat'"`"
+		if [ -d $PluginChatDir ] && [ "$PluginChatDir" != "$MySB_InstallDir" ]; then
+			rm -vrf $PluginChatDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginChatFile ]; then
+			wget --no-check-certificate $PluginChatUrl -O $MySB_InstallDir/files/$PluginChatFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginChatFile -C $MySB_InstallDir/temp/	
+		SubDirChat="`tar -ztf $MySB_InstallDir/files/$PluginChatFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirChat ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirChat $PluginChatDir
+		fi
+	fi
+else
+	if [ -d $PluginChatDir ]; then
+		rm -vrf $PluginChatDir
+	fi
+fi
+
+#### Plugin Logoff
+echo
+echo "########## Plugin Logoff"
+echo
+PluginLogoffActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Logoff'"`"
+PluginLogoffDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Logoff'"`"
+if [ "$PluginLogoffActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginLogoffDir ]; then
+		PluginLogoffUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Logoff'"`"
+		PluginLogoffFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin Logoff'"`"
+		if [ -d $PluginLogoffDir ] && [ "$PluginChatDir" != "$MySB_InstallDir" ]; then
+			rm -vrf $PluginLogoffDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginLogoffFile ]; then
+			wget --no-check-certificate $PluginLogoffUrl -O $MySB_InstallDir/files/$PluginLogoffFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginLogoffFile -C $MySB_InstallDir/temp/	
+		SubDirLogoff="`tar -ztf $MySB_InstallDir/files/$PluginLogoffFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirLogoff ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirLogoff $PluginLogoffDir
+		fi
+	fi
+else
+	if [ -d $PluginLogoffDir ]; then
+		rm -vrf $PluginLogoffDir
+	fi
+fi
+
+#### Plugin tAdd-Labels
+echo
+echo "########## Plugin tAdd-Labels"
+echo
+PluginLbllActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin tAdd-Labels'"`"
+PluginLbllDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin tAdd-Labels'"`"
+if [ "$PluginLbllActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginLbllDir ]; then
+		PluginLbllUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin tAdd-Labels'"`"
+		PluginLbllFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin tAdd-Labels'"`"
+		if [ -d $PluginLbllDir ] && [ "$PluginLbllDir" != "$MySB_InstallDir" ]; then
+			rm -vrf $PluginLbllDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginLbllFile ]; then
+			wget --no-check-certificate $PluginLbllUrl -O $MySB_InstallDir/files/$PluginLbllFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginLbllFile -C $MySB_InstallDir/temp/
+		SubDirLbll="`tar -ztf $MySB_InstallDir/files/$PluginLbllFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirLbll ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirLbll $PluginLbllDir
+		fi
+	fi
+else
+	if [ -d $PluginLbllDir ]; then
+		rm -vrf $PluginLbllDir
+	fi
+fi
+
+#### Plugin NFO
+echo
+echo "########## Plugin NFO"
+echo
+PluginNfoActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin NFO'"`"
+PluginNfoDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin NFO'"`"
+if [ "$PluginNfoActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginNfoDir ]; then
+		PluginNfoUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin NFO'"`"
+		PluginNfoFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin NFO'"`"
+		if [ -d $PluginNfoDir ] && [ "$PluginNfoDir" != "$MySB_InstallDir" ]; then
+			rm -vrf $PluginNfoDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginNfoFile ]; then
+			wget --no-check-certificate $PluginNfoUrl -O $MySB_InstallDir/files/$PluginNfoFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginNfoFile -C $MySB_InstallDir/temp/
+		SubDirNfo="`tar -ztf $MySB_InstallDir/files/$PluginNfoFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirNfo ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirNfo $PluginNfoDir
+		fi
+	fi
+else
+	if [ -d $PluginNfoDir ]; then
+		rm -vrf $PluginNfoDir
+	fi
+fi
+
+#### Plugin Ratiocolor
+echo
+echo "########## Plugin Ratiocolor"
+echo
+PluginRatiocolorActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin RatioColor'"`"
+PluginRatiocolorDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin RatioColor'"`"
+if [ "$PluginRatiocolorActive" == "1" ]; then
+	if [ -d $PluginRatiocolorDir ]; then
+		cd $PluginRatiocolorDir
+		git stash
+		git pull
+	else
+		PluginRatiocolorUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin RatioColor'"`"
+		git clone $PluginRatiocolorUrl $PluginRatiocolorDir
+	fi
+	perl -pi -e "s/changeWhat = \"cell-background\";/changeWhat = \"font\";/g" $PluginRatiocolorDir/init.js
+else
+	if [ -d $PluginRatiocolorDir ] && [ "$PluginRatiocolorDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginRatiocolorDir
+	fi
+fi
+
+#### Plugin Filemanager
+echo
+echo "########## Plugin Filemanager"
+echo
+PluginFilemanagerActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin FileManager'"`"
+PluginFilemanagerDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin FileManager'"`"
+if [ "$PluginFilemanagerActive" == "1" ]; then
+	if [ -d $PluginFilemanagerDir ]; then
+		svn up $PluginFilemanagerDir
+	else
+		PluginFilemanagerUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin FileManager'"`"
+		svn co $PluginFilemanagerUrl $PluginFilemanagerDir
+	fi
+else
+	if [ -d $PluginFilemanagerDir ] && [ "$PluginFilemanagerDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginFilemanagerDir
+	fi
+fi
+
+#### Plugin FileUpload
+echo
+echo "########## Plugin FileUpload"
+echo
+PluginFileuploadActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin FileUpload'"`"
+PluginFileuploadDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin FileUpload'"`"
+if [ "$PluginFileuploadActive" == "1" ]; then
+	if [ -d $PluginFileuploadDir ]; then
+		svn up $PluginFileuploadDir
+	else
+		PluginFileuploadUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin FileUpload'"`"
+		svn co $PluginFileuploadUrl $PluginFileuploadDir
+	fi
+else
+	if [ -d $PluginFileuploadDir ] && [ "$PluginFilemanagerDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginFileuploadDir
+	fi
+fi
+
+#### Plugin Fileshare
+echo
+echo "########## Plugin Fileshare"
+echo
+PluginFileshareActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin FileShare'"`"
+PluginFileshareDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin FileShare'"`"
+if [ "$PluginFileshareActive" == "1" ]; then
+	if [ -d $PluginFileshareDir ]; then
+		svn up $PluginFileshareDir
+	else
+		PluginFileshareUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin FileShare'"`"
+		svn co $PluginFileshareUrl $PluginFileshareDir
+	fi
+	perl -pi -e "s/$limits\['duration'\] = 1;/$limits\['duration'\] = 0;/g" $PluginFileshareDir/conf.php
+	perl -pi -e "s/$limits\['links'\] = 1;/$limits\['links'\] = 0;/g" $PluginFileshareDir/conf.php
+	perl -pi -e "s/http:\/\/robits.org\/rutorrent\/share.php/https:\/\/$HostNameFQDN:$Port_HTTPS\/fileshare.php/g" $PluginFileshareDir/conf.php
+else
+	if [ -d $PluginFileshareDir ] && [ "$PluginFileshareDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginFileshareDir
+	fi
+fi
+
+#### Plugin Mediastream
+echo
+echo "########## Plugin Mediastream"
+echo
+PluginMediastreamActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin MediaStream'"`"
+PluginMediastreamDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin MediaStream'"`"
+if [ "$PluginMediastreamActive" == "1" ]; then
+	if [ -d $PluginMediastreamDir ]; then
+		svn up $PluginMediastreamDir
+	else
+		PluginMediastreamUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin MediaStream'"`"
+		svn co $PluginMediastreamUrl $PluginMediastreamDir
+	fi
+	echo "<?php \$streampath = \"https://$HostNameFQDN:$Port_HTTPS/view.php\"; ?>" > $PluginMediastreamDir/conf.php
+else
+	if [ -d $PluginMediastreamDir ] && [ "$PluginMediastreamDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginMediastreamDir
+	fi
+fi
+
+#### Plugin Stream
+echo
+echo "########## Plugin Stream"
+echo
+PluginStreamActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Stream'"`"
+PluginStreamDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Stream'"`"
+if [ "$PluginStreamActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginStreamDir ]; then
+		PluginStreamUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Stream'"`"
+		PluginStreamFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin Stream'"`"
+		if [ -d $PluginStreamDir ]; then
+			rm -vrf $PluginStreamDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginStreamFile ]; then
+			wget --no-check-certificate $PluginStreamUrl -O $MySB_InstallDir/files/$PluginStreamFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginStreamFile -C $MySB_InstallDir/temp/
+		SubDirStream="`tar -ztf $MySB_InstallDir/files/$PluginStreamFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirStream ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirStream $PluginStreamDir
+		fi
+	fi
+	perl -pi -e "s/define\('USE_NGINX', false\);/define\('USE_NGINX', true\);/g" $PluginStreamDir/config.php
+	perl -pi -e "s/define\('SCHEME', http\);/define\('SCHEME', https\);/g" $PluginStreamDir/config.php
+else
+	if [ -d $PluginStreamDir ] && [ "$PluginStreamDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginStreamDir
+	fi
+fi
+
+#### Pause WebUI
+echo
+echo "########## Plugin Pause WebUI"
+echo
+PluginWebUiActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Pause WebUI'"`"
+PluginWebUiDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Pause WebUI'"`"
+if [ "$PluginWebUiActive" == "1" ]; then
+	if [ "$1" == "REFRESH" ] || [ ! -d $PluginWebUiDir ]; then
+		PluginWebUiUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Pause WebUI'"`"
+		PluginWebUiFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ruTorrent Plugin Pause WebUI'"`"		
+		if [ -d $PluginWebUiDir ]; then
+			rm -vrf $PluginWebUiDir
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginWebUiFile ]; then
+			wget --no-check-certificate $PluginWebUiUrl -O $MySB_InstallDir/files/$PluginWebUiFile
+		fi
+		unzip $MySB_InstallDir/files/$PluginWebUiFile -d $MySB_InstallDir/temp/
+		SubDirWebUi="`unzip -l $MySB_InstallDir/files/$PluginWebUiFile | awk '{ print $4 }' | cut -d '/' -f 1 | uniq | sed '1,3d;$d'`"
+		if [ -d $MySB_InstallDir/temp/$SubDirWebUi ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirWebUi $PluginWebUiDir
+		fi
+	fi
+else
+	if [ -d $PluginWebUiDir ] && [ "$PluginWebUiDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginWebUiDir
+	fi
+fi
+
+#### Mobile
+echo
+echo "########## Plugin Mobile"
+echo
+PluginMobileActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Mobile'"`"
+PluginMobileDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Mobile'"`"
+if [ "$PluginMobileActive" == "1" ]; then
+	if [ -d $PluginMobileDir ]; then
+		cd $PluginMobileDir
+		git stash
+		git pull
+	else
+		PluginMobileUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Mobile'"`"
+		git clone $PluginMobileUrl $PluginMobileDir
+	fi
+else
+	if [ -d $PluginMobileDir ] && [ "$PluginMobileDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginMobileDir
+	fi
+fi
+
+#### Autodl-irssi
+echo
+echo "########## Plugin Autodl-irssi"
+echo
+PluginAutodlActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'ruTorrent Plugin Autodl-irssi'"`"
+PluginAutodlDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Autodl-irssi'"`"
+if [ "$PluginAutodlActive" == "1" ]; then
+	if [ -d $PluginAutodlDir ]; then
+		cd $PluginAutodlDir
+		git stash
+		git pull
+	else
+		PluginAutodlUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Autodl-irssi'"`"
+		git clone $PluginAutodlUrl $PluginAutodlDir
+	fi
+else
+	if [ -d $PluginAutodlDir ] && [ "$PluginAutodlDir" != "$MySB_InstallDir" ]; then
+		rm -vrf $PluginAutodlDir
+	fi
+fi
+
+#### Theme
+echo
+echo "########## Plugin Theme"
+echo
+if [ "`cat $RutorrentDir/css/style.css | grep 'for Oblivion'`" == "" ]; then
+	echo "" | tee -a $RutorrentDir/css/style.css
+	echo "/* for Oblivion */" | tee -a $RutorrentDir/css/style.css
+	echo ".meter-value-start-color { background-color: #E05400 }" | tee -a $RutorrentDir/css/style.css
+	echo ".meter-value-end-color { background-color: #8FBC00 }" | tee -a $RutorrentDir/css/style.css
+	echo "::-webkit-scrollbar {width:12px;height:12px;padding:0px;margin:0px;}" | tee -a $RutorrentDir/css/style.css
+fi
+perl -pi -e "s/\$defaultTheme \= \"\"\;/\$defaultTheme \= \"Oblivion\"\;/g" $RutorrentPluginsDir/theme/conf.php
+
+#### ruTorrent favicons trackers
+echo
+echo "########## ruTorrent favicons trackers"
+echo
+TrackersFavicons=$(ls -1r $MySB_InstallDir/files/trackers_favicons/)
+for TrackersFavicons in $LISTING; do
+	if [ ! -f $RutorrentPluginsDir/tracklabels/trackers/$TrackersFavicons ]; then
+		cp -v $MySB_InstallDir/files/trackers_favicons/$TrackersFavicons $RutorrentPluginsDir/tracklabels/trackers/
+	fi
+done
+
+#### Plowshare
+echo
+echo "########## Plowshare"
+echo
+PluginPlowshareDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'Plowshare'"`"
+PluginPlowshareUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Plowshare'"`"
+PluginPlowshareFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Plowshare'"`"
+PluginPlowshareType="`Func_SQL_Command 'SELECT' 'MySB_db' 'type' 'repositories' "name = 'Plowshare'"`"
+case "$PluginPlowshareType" in
+	"GIT")
+		if [ -d $PluginPlowshareDir ]; then
+			cd $PluginPlowshareDir/
+			git stash
+			git pull
+		else
+			git clone $PluginPlowshareUrl $PluginPlowshareDir
+			cd $PluginPlowshareDir
+		fi
+	;;
+	*)
+		if [ "$1" == "REFRESH" ]; then
+			if [ -d $PluginPlowshareDir ]; then
+				rm -vrf $PluginPlowshareDir
+			fi
+		fi
+		if [ ! -f $MySB_InstallDir/files/$PluginPlowshareFile ]; then
+			wget --no-check-certificate $PluginPlowshareUrl -O $MySB_InstallDir/files/$PluginPlowshareFile
+		fi
+		tar -zxvf $MySB_InstallDir/files/$PluginPlowshareFile -C $MySB_InstallDir/temp/
+		SubDirPlowshare="`tar -ztf $MySB_InstallDir/files/$PluginPlowshareFile | cut -d '/' -f 1 | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDirPlowshare ] && [ ! -d $PluginPlowshareDir ]; then
+			mv -v $MySB_InstallDir/temp/$SubDirPlowshare $PluginPlowshareDir
+		fi
+	;;
+esac
+
+cd $PluginPlowshareDir
+make clean
+make install
+
+#### Create directories & change rights
+echo
+log_daemon_msg "Change owners and rights for files and directories"
+ManageDirectoriesAndFiles
+StatusLSB
+
+#### Get Tracker Certificates
+log_daemon_msg "Check and get all trackers certs"
+ScriptInvoke 'screen' "$MySB_InstallDir/scripts/GetTrackersCert.bsh" 'REFRESH'
+StatusLSB
+
+#### START services
+Switch="$1"
+if [ "$Switch" != "UPGRADE" ]; then
+	ManageServices start "cron"
+
+	for seedUser in $UsersList; do
+		if [ -f /etc/init.d/rtorrent-$seedUser ]; then
+			service rtorrent-$seedUser status &> /dev/null
+			if [ $? -gt 0 ]; then
+				service rtorrent-$seedUser restart
+			fi
+		fi
+	done
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
