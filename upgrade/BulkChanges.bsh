@@ -1,0 +1,232 @@
+#!/bin/bash
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_before
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+case "$1" in
+	"BEFORE")
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		ManageDirectoriesAndFiles 'global'
+
+		# Upgrade in progress page
+		UpgradeInProgress "on"
+
+		# Switching DNS
+		SwitchDNS "bind"
+
+		# Forcing NTP update
+		ping -c4 0.fr.pool.ntp.org
+		/usr/sbin/ntpdate -u 0.fr.pool.ntp.org
+
+		#### MySQL
+		mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Schema_2016-02-03.sql
+
+		if [ -z $funcs_Install ]; then
+			source $MySB_InstallDir/inc/funcs_by_script/funcs_Install
+		fi
+		#### To call for every upgrade - EoF
+		####################################
+
+		#### MySQL
+		Func_SQL_Command 'ALTER' 'MySB_db' 'CHANGE' 'trackers_list_ipv4' 'ipv4' "VARCHAR( 15 )" '-echo'
+		Func_SQL_Command 'ALTER' 'MySB_db' 'DROP' 'system' 'security_params' '-echo'
+		Func_SQL_Command 'ALTER' 'MySB_db' 'ADD' 'system' 'letsencrypt_date' "DATE NOT NULL" '-echo'
+		Func_SQL_Command 'ALTER' 'MySB_db' 'ADD' 'system' 'letsencrypt_openport' "TINYINT( 1 ) NOT NULL DEFAULT '0'" '-echo'
+		Func_SQL_Command 'ALTER' 'MySB_db' 'ADD' 'users_rtorrent_cfg' 'sync_mode' "TINYINT( 1 ) NOT NULL DEFAULT '0'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'repositories' 'type,dir,name,version,file,url,active' "'GIT','/sources/letsencrypt','Lets Encrypt', '0.3.0', 'LetsEncrypt_v0.3.0.zip', 'https://github.com/letsencrypt/letsencrypt', '1'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'repositories' 'type,dir,name,version,file,url,active' "'TARGZ','/sources/rkhunter','RKHunter', '1.4.2', 'rkhunter_v1.4.2.tar.gz', 'http://downloads.sourceforge.net/project/rkhunter/rkhunter/1.4.2/rkhunter-1.4.2.tar.gz?r=&ts=1456674223&use_mirror=freefr', '1'" '-echo'
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'repositories' "version = '1.6.1', file= 'dnscrypt-proxy_v1.6.1.tar.gz', old_file = 'dnscrypt-proxy_v1.6.0.tar.gz', url = 'http://download.dnscrypt.org/dnscrypt-proxy/dnscrypt-proxy-1.6.1.tar.gz'" "name = 'DNScrypt-proxy'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'services' 'serv_name,port_tcp1,to_install' "'Lets Encrypt', '443', '1'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'lets_encrypt' 'addresses,ipv4' "'acme-v01.api.letsencrypt.org', '104.92.240.99'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'lets_encrypt' 'addresses,ipv4' "'outbound1.letsencrypt.org', '66.133.109.36'" '-echo'
+		Func_SQL_Command 'INSERT' 'MySB_db' 'lets_encrypt' 'addresses,ipv4' "'outbound2.letsencrypt.org', '64.78.149.164'" '-echo'
+
+		#### ownCloud force upgrade to v8.2.2
+		if [ "$IsInstalled_ownCloud" == "YES" ]; then
+			ownCloudFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'ownCloud'"`"
+			ownCloudOldFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'old_file' 'repositories' "name = 'ownCloud'"`"
+			cp -vf $MySB_InstallDir/files/$ownCloudFile $MySB_InstallDir/files/$ownCloudOldFile
+		fi
+
+		#### PHP - Merge new config files
+		TimeZoneEscaped="`echo $TimeZone | sed s,/,\\\\\\\\\\/,g`"
+		if [ -f /etc/php5/cli/php.ini.ucf-dist ]; then
+			mv -v /etc/php5/cli/php.ini.ucf-dist /etc/php5/cli/php.ini
+			perl -pi -e "s/^;always_populate_raw_post_data/always_populate_raw_post_data/g" /etc/php5/fpm/php.ini
+			perl -pi -e "s/^;date.timezone =/date.timezone = $TimeZoneEscaped/g" /etc/php5/cli/php.ini
+			perl -pi -e "s/^expose_php = On/expose_php = Off/g" /etc/php5/cli/php.ini
+		fi
+		if [ -f /etc/php5/fpm/php.ini.ucf-dist ]; then
+			mv -v /etc/php5/fpm/php.ini.ucf-dist /etc/php5/fpm/php.ini
+			perl -pi -e "s/^;always_populate_raw_post_data/always_populate_raw_post_data/g" /etc/php5/fpm/php.ini
+			perl -pi -e "s/upload_max_filesize = 2M/upload_max_filesize = 16M/g" /etc/php5/fpm/php.ini
+			perl -pi -e "s/post_max_size = 8M/post_max_size = 16M/g" /etc/php5/fpm/php.ini
+			perl -pi -e "s/^;date.timezone =/date.timezone = $TimeZoneEscaped/g" /etc/php5/fpm/php.ini
+		fi
+		perl -pi -e "s/^;session.save_path/session.save_path/g" /etc/php5/fpm/php.ini
+		perl -pi -e "s/^;session.save_path/session.save_path/g" /etc/php5/cli/php.ini
+		# TMPFS
+		sed -i '/PHP TMPFS/d' /etc/fstab
+		sed -i '/\/var\/lib\/php5\/sessions/d' /etc/fstab
+		echo "# PHP TMPFS" >> /etc/fstab
+		echo "tmpfs   /var/lib/php5/sessions tmpfs defaults,nosuid,noatime,mode=1777 0 0" >> /etc/fstab
+
+		#### Move some files & directories
+		# Sources List Directory
+		if [ -d /etc/apt/sources.list.d ]; then rm -vf /etc/apt/sources.list.d/* &> /dev/null; fi
+
+		#### Renew Certificate
+		rm -vrf $MySB_InstallDir/ssl/
+		ScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/Certificates" 'CreateCACertificate' 'INSTALL'
+		ScriptInvoke 'source' "$MySB_InstallDir/install/Certificates" 'CreateServiceCertificate' 'mysb'
+
+		#### Samba
+		if [ "$IsInstalled_Samba" == "YES" ]; then
+			ManageServices stop "samba"
+			mv -vf /var/log/samba/log.nmbd* $MySB_InstallDir/temp/
+			mv -vf /var/log/samba/log.smbd* $MySB_InstallDir/temp/
+			mv -vf /var/log/samba/log.server-dp* $MySB_InstallDir/temp/
+			mv -vf /var/log/samba/cores $MySB_InstallDir/temp/
+			rm -vf /var/log/samba/*
+			mv -vf $MySB_InstallDir/temp/cores /var/log/samba/
+			mv -vf $MySB_InstallDir/temp/log.server-dp* /var/log/samba/
+			mv -vf $MySB_InstallDir/temp/log.smbd* /var/log/samba/
+			mv -vf $MySB_InstallDir/temp/log.nmbd* /var/log/samba/
+			cp -vf $MySB_InstallDir/templates/etc.samba.smb.conf.tmpl /etc/samba/smb.conf
+			ManageServices start "samba"
+		fi
+
+		#### Logwatch
+		cp -vf $MySB_InstallDir/templates/etc.logwatch.conf.logwatch.conf.tmpl /etc/logwatch/conf/logwatch.conf
+
+		#### Disable IPv6
+		/sbin/sysctl -w net.ipv6.conf.all.disable_ipv6="1"
+		/sbin/sysctl -w net.ipv6.conf.default.disable_ipv6="1"
+		/sbin/sysctl -w net.ipv6.conf.lo.disable_ipv6="1"
+		/sbin/sysctl -w net.ipv6.conf.eth0.disable_ipv6="1"
+		sysctl -p
+
+		#### Remove RKHunter 1.4.0
+		PackagesManage purge "rkhunter unhide unhide.rb"
+
+		#### Turning off filesystem access times
+		if [ -z "`cat /etc/fstab | grep 'errors=remount-ro' | grep 'noatime,nodiratime'`" ]; then
+			perl -pi -e "s/errors=remount-ro/noatime,nodiratime,errors=remount-ro/g" /etc/fstab
+		fi
+	;;
+	"AFTER")
+		#### Upgrade OpenSSH-server
+		PackagesManage install "openssh-server" "backports"
+
+		#### Install LFTP command
+		PackagesManage install "lftp"
+
+		#### Some Cleaning
+		rm -rf $MySB_InstallDir/temp/* &> /dev/null
+		if [ -d /var/log/exim4 ]; then rm -rvf /var/log/exim4; fi
+		if [ -d /var/log/news ]; then rm -rvf /var/log/news; fi
+		if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -vf /etc/init.d/plexmediaserver.dpkg-bak; fi
+		if [ -f /etc/samba/smb.conf.ucf-dist ]; then rm -vf /etc/samba/smb.conf.ucf-dist; fi
+		ListingUsers
+		for seedUser in $UsersList; do
+			rm /home/$FnUser/scripts/*.example &> /dev/null
+			rm /home/$FnUser/scripts/*.list &> /dev/null
+			rm /home/$FnUser/scripts/list* &> /dev/null
+		done
+
+		#### Apply new certificate (Self-signed OR Let's Encrypt)
+		# Webmin
+		if [ "$IsInstalled_Webmin" == "YES" ]; then
+			if [ -f $MySB_InstallDir/ssl/fullchain.pem ]; then
+				cat $MySB_InstallDir/ssl/privkey.pem > /etc/webmin/miniserv.pem
+				cat $MySB_InstallDir/ssl/fullchain.pem >> /etc/webmin/miniserv.pem
+			else
+				cat $MySB_InstallDir/ssl/mysb.cert > /etc/webmin/miniserv.pem
+				cat $MySB_InstallDir/ssl/mysb.key >> /etc/webmin/miniserv.pem
+			fi
+		fi
+		# Postfix / sTunnel / VSFTPd
+		perl -pi -e "s/postfix.cert/mysb.cert/g" /etc/postfix/main.cf
+		perl -pi -e "s/postfix.key/mysb.key/g" /etc/postfix/main.cf
+		perl -pi -e "s/stunnel.cert/mysb.cert/g" /etc/stunnel/stunnel.conf
+		perl -pi -e "s/stunnel.key/mysb.key/g" /etc/stunnel/stunnel.conf
+		perl -pi -e "s/vsftpd.cert/mysb.cert/g" /etc/vsftpd.conf
+		perl -pi -e "s/vsftpd.key/mysb.key/g" /etc/vsftpd.conf
+
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		ManageDirectoriesAndFiles 'global'
+
+		# STOP & START services
+		ManageServices stop "ntp stunnel4 postfix"
+		ManageServices start "ntp stunnel4 postfix samba nginx dnscrypt-proxy webmin"
+
+		# Upgrade in progress page
+		UpgradeInProgress "off"
+
+		# Update version info
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "mysb_version = '$MySB_CurrentVersion'" "id_system = '1'"
+		if [ -f $MySB_InstallDir/files/current_version ]; then
+			rm -f $MySB_InstallDir/files/current_version
+		fi
+		figlet MySB $MySB_CurrentVersion > /etc/motd
+		echo >> /etc/motd
+
+		# Send mail for each user with new version
+		if [ -f $MySB_InstallDir/inc/vars ]; then source $MySB_InstallDir/inc/vars; fi
+		MainUserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "admin = '1'"`"
+		RutorrentDirEscaped="`echo $RutorrentDir | sed s,/,\\\\\\\\\\/,g`"
+		for seedUser in $UsersList; do
+			UserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$seedUser'"`"
+			UserPassword="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_passwd' 'users' "users_ident = '$seedUser'"`"
+			cp $MySB_InstallDir/templates/init/etc.init.rtorrent.tmpl /etc/init.d/rtorrent-$seedUser
+			perl -pi -e "s/<username>/$seedUser/g" /etc/init.d/rtorrent-$seedUser
+			chmod +x /etc/init.d/rtorrent-$seedUser
+			source $MySB_InstallDir/inc/funcs_by_script/funcs_MySB_CreateUser
+			CreateRtorrentConfigFile "$seedUser" 'force'
+
+			if [ "$UserId" == "$MainUserId" ] && [ ! -z "$UserPassword" ]; then
+				# Remove main user password from database
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "users_passwd = ''" "admin = '1'"
+				ScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_ChangeUserPassword" "$seedUser" "$UserPassword" 'UPGRADE'
+			else
+				# Init password required
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "init_password = '1'" "users_ident = '$seedUser'"
+				Subject="$Upgrade_SubjectUpgraded $MySB_CurrentVersion"
+				Case="upgrade"
+				SendMail "$Subject" "$seedUser" "$Case"
+			fi
+		done
+		#### To call for every upgrade - EoF
+		####################################
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

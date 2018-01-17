@@ -1,0 +1,509 @@
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+######################################################################
+funcs_MySB_CreateUser=1
+##################### FIRST LINE #####################################
+
+#### Cakebox-Light Users Config
+CakeboxUsersConfigs() {
+	if [ "$IsInstalled_Cakebox" == "YES" ] && [ -d $CakeboxDir ]; then
+		FnUser="$1"
+		FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+		HomeDirEscaped=`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`
+
+		if [ -f $CakeboxDir/config/default.php.dist ] && [ ! -f  $CakeboxDir/config/$FnUser.php ]; then
+			cp $CakeboxDir/config/default.php.dist $CakeboxDir/config/$FnUser.php
+			sed -i "s/\/var\/www\//$HomeDirEscaped\/rtorrent\//g;" $CakeboxDir/config/$FnUser.php
+			sed -i "s/\/access\//\/$FnUser\/rtorrent\//g;" $CakeboxDir/config/$FnUser.php
+			case "$EnvLang" in
+				"fr")
+					perl -pi -e "s/\"en\"/\"$EnvLang\"/g" $CakeboxDir/config/$FnUser.php
+				;;
+				"en")
+					perl -pi -e "s/\"fr\"/\"$EnvLang\"/g" $CakeboxDir/config/$FnUser.php
+				;;
+			esac
+			sed -i "s/\"html5\"/\"divx\"/g;" $CakeboxDir/config/$FnUser.php
+		fi
+
+		if [ -f  $CakeboxDir/config/$FnUser.php ]; then
+			chown root:www-data $CakeboxDir/config/$FnUser.php
+			chmod 0660 $CakeboxDir/config/$FnUser.php
+		fi
+
+		unset FnHomeDir HomeDirEscaped
+	fi
+}
+
+#### Change rights for users
+ManageUserHomeDir() {
+	FnUser="$1"
+	FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+
+	#### Create missing directories
+	if [ ! -d $FnHomeDir ]; then mkdir $FnHomeDir; fi
+	if [ ! -d $FnHomeDir/.ssh ]; then mkdir $FnHomeDir/.ssh; fi
+	if [ ! -d $FnHomeDir/blocklist ]; then mkdir $FnHomeDir/blocklist; fi
+	if [ ! -d $FnHomeDir/logs ]; then mkdir $FnHomeDir/logs; fi
+	if [ ! -d $FnHomeDir/scripts ]; then mkdir $FnHomeDir/scripts; fi
+	if [ ! -d $FnHomeDir/rtorrent ]; then mkdir $FnHomeDir/rtorrent; fi
+	if [ ! -d $FnHomeDir/rtorrent/watch ]; then mkdir $FnHomeDir/rtorrent/watch; fi
+	if [ ! -d $FnHomeDir/rtorrent/incomplete ]; then mkdir $FnHomeDir/rtorrent/incomplete; fi
+	if [ ! -d $FnHomeDir/rtorrent/complete ]; then mkdir $FnHomeDir/rtorrent/complete; fi
+	if [ ! -d $FnHomeDir/rtorrent/.session ]; then mkdir $FnHomeDir/rtorrent/.session; fi
+	if [ ! -d $FnHomeDir/rtorrent/torrents ]; then mkdir $FnHomeDir/rtorrent/torrents; fi
+	if [ ! -d $FnHomeDir/rtorrent/share ]; then mkdir $FnHomeDir/rtorrent/share; fi
+
+	#### Change rights and owners
+	# /home/user
+	chown root:root $FnHomeDir
+	chmod 0755 $FnHomeDir
+
+	# .bashrc, .bash_logout, .profile, .rtorrent.rc, .rTorrent.bsh, .ssh/
+	if [ -d $FnHomeDir/.ssh ]; then
+		chown root:$FnUser $FnHomeDir/.ssh
+		chmod 0750 $FnHomeDir/.ssh
+	fi
+	if [ -f $FnHomeDir/.rtorrent.rc ]; then
+		chown root:$FnUser $FnHomeDir/.rtorrent.rc
+		chmod 0740 $FnHomeDir/.rtorrent.rc
+	fi
+	if [ -f $FnHomeDir/.rTorrent.bsh ]; then
+		chown root:$FnUser $FnHomeDir/.rTorrent.bsh
+		chmod 0750 $FnHomeDir/.rTorrent.bsh
+	fi
+	if [ -f $FnHomeDir/.bashrc ]; then
+		chown root:$FnUser $FnHomeDir/.bashrc
+		chmod 0740 $FnHomeDir/.bashrc
+	fi
+	if [ -f $FnHomeDir/.bash_logout ]; then
+		chown root:$FnUser $FnHomeDir/.bash_logout
+		chmod 0740 $FnHomeDir/.bash_logout
+	fi
+	if [ -f $FnHomeDir/.profile ]; then
+		chown root:$FnUser $FnHomeDir/.profile
+		chmod 0740 $FnHomeDir/.profile
+	fi
+
+	# /home/user/blocklist
+	chmod -R 0755 $FnHomeDir/blocklist
+	chown -R root:$FnUser $FnHomeDir/blocklist
+	# /home/user/logs
+	chmod -R 0775 $FnHomeDir/logs
+	chown -R root:$FnUser $FnHomeDir/logs
+	# /home/user/scripts
+	chmod -R 0774 $FnHomeDir/scripts
+	chown -R root:$FnUser $FnHomeDir/scripts
+	# /home/user/rtorrent
+	chown root:$FnUser $FnHomeDir/rtorrent
+	chmod 0775 $FnHomeDir/rtorrent
+	# /home/user/rtorrent/watch
+	chown root:$FnUser $FnHomeDir/rtorrent/watch
+	chmod 0775 $FnHomeDir/rtorrent/watch
+	# /home/user/rtorrent/incomplete
+	chown root:$FnUser $FnHomeDir/rtorrent/incomplete
+	chmod 0775 $FnHomeDir/rtorrent/incomplete
+	# /home/user/rtorrent/complete
+	chown root:$FnUser $FnHomeDir/rtorrent/complete
+	chmod 0775 $FnHomeDir/rtorrent/complete
+	# /home/user/rtorrent/.session
+	chown root:$FnUser $FnHomeDir/rtorrent/.session
+	chmod 0771 $FnHomeDir/rtorrent/.session
+
+	unset FnHomeDir
+}
+
+#### Seedbox-Manager Users Config
+ManagerUsersConfigs() {
+	if [ "$IsInstalled_Manager" == "YES" ]; then
+		FnUser="$1"
+		FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+		HomeDirEscaped="`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`"
+		PortSCGI="`Func_SQL_Command 'SELECT' 'MySB_db' 'scgi_port' 'users' "users_ident = '$FnUser'"`"
+		UserNameUpper="`echo $FnUser | tr '[:lower:]' '[:upper:]'`"
+
+		if [ ! -d $ManagerDir/conf/users/$FnUser ]; then mkdir -p $ManagerDir/conf/users/$FnUser; fi
+		if [ -f $ManagerDir/conf/config.ini ] && [ ! -f $ManagerDir/conf/users/$FnUser/config.ini ]; then
+			cp $ManagerDir/conf/config.ini $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/user_directory = \"\/\"/user_directory = \"$HomeDirEscaped\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/scgi_folder = \"\/RPC1\"/scgi_folder = \"\/$UserNameUpper\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/rutorrent.domaine.fr, name = rutorrent/https:\/\/$HostNameFQDN:$Port_HTTPS\/ru, name = ruTorrent/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/cakebox.domaine.fr, name = cakebox/https:\/\/$HostNameFQDN:$Port_HTTPS, name = MySB Portal/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/port_ftp = \"21\"/port_ftp = \"$Port_FTP\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/port_sftp = \"22\"/port_sftp = \"$Port_SSH\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/contact@exemple.com/$MainUserEmail/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/mondedie.fr/http:\/\/www.google.fr/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			if [ "$MainUser" == "$FnUser" ]; then	
+				sed -i "s/owner = no/owner = yes/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			fi
+		fi
+
+		unset FnHomeDir HomeDirEscaped PortSCGI UserNameUpper
+	fi
+}
+
+#### ruTorrent Users Config and Plugins
+ruTorrentUsersConfigs() {
+	LISTING=$(ls -1r $RutorrentPluginsDir/)
+	FnUser="$1"
+	FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+	HomeDirEscaped="`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`"
+	PortSCGI="`Func_SQL_Command 'SELECT' 'MySB_db' 'scgi_port' 'users' "users_ident = '$FnUser'"`"
+	UserNameUpper="`echo $FnUser | tr '[:lower:]' '[:upper:]'`"
+
+	# share
+	if [ ! -d $RutorrentDir/share/users/$FnUser/settings/ ]; then mkdir -p $RutorrentDir/share/users/$FnUser/settings/; fi
+	if [ ! -d $RutorrentDir/share/users/$FnUser/torrents/ ]; then mkdir -p $RutorrentDir/share/users/$FnUser/torrents/; fi
+
+	# conf
+	if [ ! -d $RutorrentDir/conf/users/$FnUser/ ]; then mkdir -p $RutorrentDir/conf/users/$FnUser/; fi
+	if [ -f $RutorrentDir/conf/config.php ]; then
+		cp $RutorrentDir/conf/config.php $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/$topDirectory = '\/home';/$topDirectory = '$HomeDirEscaped\/rtorrent';/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/$log_file = '\/tmp\/errors.log';/$log_file = '$HomeDirEscaped\/logs\/rutorrent.log';/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/RPC2/$UserNameUpper/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/5000/$PortSCGI/g" $RutorrentDir/conf/users/$FnUser/config.php
+	fi
+	if [ -f $RutorrentDir/conf/access.ini ]; then cp $RutorrentDir/conf/access.ini $RutorrentDir/conf/users/$FnUser/access.ini; fi
+
+	echo "[default]" > $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "enabled = user-defined" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeToolbar = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeMenu = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeOptions = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeTabs = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeColumns = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeStatusBar = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeCategory = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canBeShutdowned = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+
+	for Plugin in $LISTING; do	
+		if [ -d $RutorrentPluginsDir/$Plugin ]; then
+			if [ -f $RutorrentPluginsDir/$Plugin/conf.php ] || [ -f $RutorrentPluginsDir/$Plugin/config.php ]; then
+				# For each plugin:
+				#	1) Do a global modification
+				#	2) Copy some config file for all users
+				#	3) Enable it for each user
+				case $Plugin in	
+					'linkseedboxmanager')
+						if [ "$IsInstalled_Manager" == "NO" ] && [ "$ToInstall_Manager" == "NO" ]; then
+							DeleteDirectory 0 "$RutorrentDir/conf/users/$FnUser/plugins/$Plugin"
+							DeleteDirectory 0 "$RutorrentPluginsDir/$Plugin"
+						else
+							echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+							echo "enabled = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						fi
+					;;
+					'linkcakebox')
+						if [ "$IsInstalled_Cakebox" == "NO" ] && [ "$ToInstall_Cakebox" == "NO" ]; then
+							if [ -d $RutorrentDir/conf/users/$FnUser/plugins/$Plugin ]; then rm -rf $RutorrentDir/conf/users/$FnUser/plugins/$Plugin; fi
+							if [ -d $RutorrentPluginsDir/$Plugin ]; then rm -rf $RutorrentPluginsDir/$Plugin; fi
+						else
+							echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+							echo "enabled = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						fi
+					;;
+					'fileupload')
+						IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileUpload'\"`"
+						if [ $IsActive -eq 0 ]; then
+							if [ -f $RutorrentDir/share/users/$FnUser/settings/fileuploads.dat ]; then
+								rm -f $RutorrentDir/share/users/$FnUser/settings/fileuploads.dat
+							fi
+						fi
+						unset IsActive
+					;;
+					'fileshare')
+						IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileShare'\"`"
+						if [ $IsActive -eq 0 ]; then
+							if [ -f $RutorrentDir/share/users/$FnUser/settings/fileshare.dat ]; then
+								rm -f $RutorrentDir/share/users/$FnUser/settings/fileshare.dat
+							fi
+						fi
+						unset IsActive
+					;;
+					*)
+						# 3) Enable it for each user
+						echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						echo "enabled = user-defined" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+					;;
+				esac
+			fi
+		fi
+	done
+
+	unset LISTING FnHomeDir HomeDirEscaped PortSCGI UserNameUpper
+}
+
+#### Manage user crontab
+UserCrontab() {
+	FnUser="$1"
+	IdUser="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$FnUser'"`"
+	HomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+	Directories="`Func_SQL_Command 'SELECT' 'MySB_db' 'sub_directory,sync_mode' 'users_rtorrent_cfg' "id_users = '$IdUser'"`"
+	Crontab="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users_crontab,minutes,hours,days,months,numday,command' 'users_crontab' "id_users = '$IdUser'"`"
+
+	echo "# Sync Mode for finished download" > $HomeDir/scripts/sync_mode
+	echo "# 0	-->	Do not start any script (no synchro)" >> $HomeDir/scripts/sync_mode
+	echo "# 1	-->	Execute scripts by crontab (*.cron)" >> $HomeDir/scripts/sync_mode
+	echo "# 2	-->	Execute scripts directly when a download is finished (*.sh)" >> $HomeDir/scripts/sync_mode
+	for Directory in $Directories; do
+		SubDirectory="`echo $Directory | awk '{split($0,a,"|"); print a[1]}'`"
+		SyncMode="`echo $Directory | awk '{split($0,a,"|"); print a[2]}'`"
+		echo "$SubDirectory|$SyncMode" >> $HomeDir/scripts/sync_mode
+	done
+
+	if [ -f $HomeDir/scripts/crontab ]; then
+		rm -f $HomeDir/scripts/crontab
+	fi
+	if [ ! -z "$Crontab" ]; then
+		for Cron in $Crontab; do
+			CronID="`echo $Cron | awk '{split($0,a,"|"); print a[1]}'`"
+			CronMinutes="`echo $Cron | awk '{split($0,a,"|"); print a[2]}'`"
+			CronHours="`echo $Cron | awk '{split($0,a,"|"); print a[3]}'`"
+			CronDays="`echo $Cron | awk '{split($0,a,"|"); print a[4]}'`"
+			CronMonths="`echo $Cron | awk '{split($0,a,"|"); print a[5]}'`"
+			CronNumday="`echo $Cron | awk '{split($0,a,"|"); print a[6]}'`"
+			CronCommand="`echo $Cron | awk '{split($0,a,"|"); print a[7]}'`"
+			# Adding cron job only if script file is present
+			if [ -f $HomeDir/scripts/$CronCommand ]; then
+				echo "$CronMinutes $CronHours $CronDays $CronMonths $CronNumday /bin/bash ~/scripts/$CronCommand > /dev/null 2>&1" >> $HomeDir/scripts/crontab
+			else
+				Func_SQL_Command 'DELETE' 'MySB_db' 'users_crontab' "id_users_crontab = '$CronID' AND id_users = '$IdUser'"
+			fi
+		done
+	else
+		echo > $HomeDir/scripts/crontab
+	fi
+	if [ -f $HomeDir/scripts/crontab ]; then
+		crontab -u $FnUser $HomeDir/scripts/crontab
+		/etc/init.d/cron reload &> /dev/null
+		rm -f $HomeDir/scripts/crontab
+	fi
+}
+
+#### rTorrent Configuration file
+CreateRtorrentConfigFile() {
+	FnUser="$1"
+	IdUser="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$FnUser'"`"
+	HomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+	Directories="`Func_SQL_Command 'SELECT' 'MySB_db' 'sub_directory,to_delete,can_be_deleted' 'users_rtorrent_cfg' "id_users = '$IdUser'"`"
+	if [ "$2" == "force" ] || [ ! -f $HomeDir/.rtorrent.rc ]; then
+		CreateNewFile=1
+	else
+		CreateNewFile=0
+	fi
+
+	# Sub-Directories
+	if [ ! -z "$Directories" ]; then
+		for Directory in $Directories; do
+			SubDirectory="`echo $Directory | awk '{split($0,a,"|"); print a[1]}'`"
+			ToDelete="`echo $Directory | awk '{split($0,a,"|"); print a[2]}'`"
+			CanBeDeleted="`echo $Directory | awk '{split($0,a,"|"); print a[3]}'`"
+
+			if [ -d $HomeDir/rtorrent/complete/$SubDirectory/ ] && [ -d $HomeDir/rtorrent/watch/$SubDirectory/ ]; then
+				CountFiles="`ls -A1 $HomeDir/rtorrent/complete/$SubDirectory/ | wc -l`"
+				if [ $CountFiles -eq 0 ]; then
+					Func_SQL_Command 'UPDATE' 'MySB_db' 'users_rtorrent_cfg' "can_be_deleted = '1'" "id_users = '$IdUser' AND sub_directory = '$SubDirectory'"
+					CanBeDeleted=1
+				else
+					Func_SQL_Command 'UPDATE' 'MySB_db' 'users_rtorrent_cfg' "can_be_deleted = '0'" "id_users = '$IdUser' AND sub_directory = '$SubDirectory'"
+					CanBeDeleted=0
+				fi
+			fi
+
+			case "$CanBeDeleted" in
+				1) # New directory OR maybe to delete
+					case "$ToDelete" in
+						1)
+							CompleteDeleted=0
+							WatchDeleted=0
+							if [ -d $HomeDir/rtorrent/complete/$SubDirectory/ ]; then
+								rmdir $HomeDir/rtorrent/complete/$SubDirectory/
+								if [ $? -eq 0 ]; then CompleteDeleted=1; fi
+							else
+								CompleteDeleted=1
+							fi
+							if [ -d $HomeDir/rtorrent/watch/$SubDirectory/ ]; then
+								rm -rf $HomeDir/rtorrent/watch/$SubDirectory/
+								if [ $? -eq 0 ]; then WatchDeleted=1; fi
+							else
+								WatchDeleted=1
+							fi
+							if [ $CompleteDeleted -eq 1 ] && [ $WatchDeleted -eq 1 ]; then
+								Func_SQL_Command 'DELETE' 'MySB_db' 'users_rtorrent_cfg' "id_users = '$IdUser' AND sub_directory = '$SubDirectory'"
+								CreateNewFile=1
+							fi
+						;;
+						0)
+							# Directory to create
+							if [ ! -d $HomeDir/rtorrent/complete/$SubDirectory ]; then
+								mkdir -p $HomeDir/rtorrent/complete/$SubDirectory &> /dev/null
+								chown root:MySB_users $HomeDir/rtorrent/complete/$SubDirectory &> /dev/null
+								chmod 0775 $HomeDir/rtorrent/complete/$SubDirectory &> /dev/null
+							fi
+							if [ ! -d $HomeDir/rtorrent/watch/$SubDirectory ]; then
+								mkdir -p $HomeDir/rtorrent/watch/$SubDirectory &> /dev/null
+								chown root:MySB_users $HomeDir/rtorrent/watch/$SubDirectory &> /dev/null
+								chmod 0775 $HomeDir/rtorrent/watch/$SubDirectory &> /dev/null
+							fi
+							CreateNewFile=1
+						;;
+					esac
+				;;
+			esac
+		done
+	fi
+
+	# Crontab & sync mode
+	UserCrontab "$FnUser"
+
+	# .rTorrent.bsh
+	cp $MySB_InstallDir/templates/rtorrent/rtorrent.bsh.tmpl $HomeDir/.rTorrent.bsh
+	perl -pi -e "s/<username>/$FnUser/g" $HomeDir/.rTorrent.bsh
+	chown root:$FnUser $HomeDir/.rTorrent.bsh
+	chmod 0750 $HomeDir/.rTorrent.bsh
+
+	# Example scripts
+	cp $MySB_InstallDir/templates/rtorrent/synchro.sh.tmpl /home/$FnUser/scripts/synchro.sh.example
+	echo "$Global_Readme_AvailableVariables" > /home/$FnUser/scripts/README
+	chown $FnUser:$FnUser /home/$FnUser/scripts/*
+	chmod 0770 /home/$FnUser/scripts/*
+	dos2unix /home/$FnUser/scripts/* &> /dev/null
+
+	if [ $CreateNewFile -eq 1 ]; then
+		# .rtorrent.rc
+		if [ -f $HomeDir/.rtorrent.rc ]; then
+			mv $HomeDir/.rtorrent.rc $HomeDir/.rtorrent.rc.old
+		fi
+		if [ ! -f $HomeDir/.rtorrent.rc ]; then
+			PortSCGI="`Func_SQL_Command 'SELECT' 'MySB_db' 'scgi_port' 'users' "users_ident = '$FnUser'"`"
+			PortRtorrent="`Func_SQL_Command 'SELECT' 'MySB_db' 'rtorrent_port' 'users' "users_ident = '$FnUser'"`"
+			Directories="`Func_SQL_Command 'SELECT' 'MySB_db' 'sub_directory' 'users_rtorrent_cfg' "id_users = '$IdUser'"`"
+
+			cp $MySB_InstallDir/templates/rtorrent/rtorrent.rc.tmpl $HomeDir/.rtorrent.rc
+			chown root:$FnUser $HomeDir/.rtorrent.rc
+			chmod 0740 $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<InstallDir>/$MySB_InstallDirEscaped/g" $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<server_ip>/$SrvIpAddress/g" $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<username>/$FnUser/g" $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<homedir>/\/home\/$FnUser/g" $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<scgi_port>/$PortSCGI/g" $HomeDir/.rtorrent.rc
+			perl -pi -e "s/<port_range>/$PortRtorrent-$PortRtorrent/g" $HomeDir/.rtorrent.rc
+			if [ "$MySB_PeerBlock" == "rTorrent" ]; then
+				perl -pi -e "s/#{1}ipv4_filter.load/ipv4_filter.load/g" $HomeDir/.rtorrent.rc
+				perl -pi -e "s/#{1}print/print/g" $HomeDir/.rtorrent.rc
+				perl -pi -e "s/#{1}schedule=load_filter/schedule=load_filter/g" $HomeDir/.rtorrent.rc
+			fi
+
+			case "$FILESYSTEMTYPE" in
+				"ext4"|"xfs"|"btrfs")
+					perl -pi -e "s/system.file_allocate.set = no/system.file_allocate.set = yes/g" $HomeDir/.rtorrent.rc
+				;;
+				*)
+					perl -pi -e "s/^system.file_allocate.set = yes/system.file_allocate.set = no/g" $HomeDir/.rtorrent.rc
+				;;
+			esac
+
+			# Watch directories
+			if [ ! -z "$Directories" ]; then
+				NumLign=$(sed -n "/watch_directory/=" $HomeDir/.rtorrent.rc)
+				Count=0
+				sed -i '/watch_directory/d' $HomeDir/.rtorrent.rc
+				sed -i "${NumLign}i\schedule = watch_directory_$Count,5,5,\"load_start=~\/rtorrent\/watch\/*.torrent,d.set_custom1=~\/rtorrent\/complete\/,d.delete_tied=\"" $HomeDir/.rtorrent.rc
+				(( NumLign++ ))
+				(( Count++ ))
+				for Directory in $Directories; do
+					sed -i "${NumLign}i\schedule = watch_directory_$Count,5,5,\"load_start=~\/rtorrent\/watch\/$Directory\/*.torrent,d.set_custom1=~\/rtorrent\/complete\/$Directory\/,d.delete_tied=\"" $HomeDir/.rtorrent.rc
+					(( NumLign++ ))
+					(( Count++ ))
+				done
+
+				# Disabling 'autotools' plugins
+				NumLign=$(sed -n "/\[autotools\]/=" $RutorrentDir/conf/users/$FnUser/plugins.ini)
+				sed "$NumLign"d"" -i $RutorrentDir/conf/users/$FnUser/plugins.ini
+				sed "$NumLign"d"" -i $RutorrentDir/conf/users/$FnUser/plugins.ini
+				echo "[autotools]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+				echo "enabled = off" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+				if [ -f $RutorrentDir/share/users/$FnUser/settings/autotools.dat ]; then
+					mv $RutorrentDir/share/users/$FnUser/settings/autotools.dat $RutorrentDir/share/users/$FnUser/settings/autotools.dat.bak
+				fi
+			else
+				# Disabling 'autotools' plugins
+				NumLign=$(sed -n "/\[autotools\]/=" $RutorrentDir/conf/users/$FnUser/plugins.ini)
+				sed "$NumLign"d"" -i $RutorrentDir/conf/users/$FnUser/plugins.ini
+				sed "$NumLign"d"" -i $RutorrentDir/conf/users/$FnUser/plugins.ini
+				echo "[autotools]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+				echo "enabled = user-defined" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+				if [ -f $RutorrentDir/share/users/$FnUser/settings/autotools.dat.bak ]; then
+					mv $RutorrentDir/share/users/$FnUser/settings/autotools.dat.bak $RutorrentDir/share/users/$FnUser/settings/autotools.dat
+				fi
+			fi
+		fi
+	fi
+}
+
+#### Monthly payment
+MonthlyPayment() {
+	if [ ! -z "$RentingGlobalCost" ] && [ ! -z "$RentingTVA" ] && [ ! -z "$RentingModel" ]; then
+		log_daemon_msg "Calculate the monthly payment"
+		export LANG=""
+		CountingUsers
+		FnX=`echo "$RentingGlobalCost/$TotalUsers" | bc -l`
+		FnY=`echo "($FnX*$RentingTVA)/100" | bc -l`
+		PriceByUser=`echo "$FnX+$FnY" | bc -l`
+		PriceByUser=`printf '%.2f\n' $PriceByUser`
+		UserToIgnore="$1"
+
+		# add new renting info
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'renting' "model = '$RentingModel', tva = '$RentingTVA', global_cost = '$RentingGlobalCost', nb_users = '$TotalUsers', price_per_users = '$PriceByUser'" "id_renting = '1'"
+		StatusLSB
+
+		ListingUsers
+		for SeedboxUser in $UsersList; do
+			SeedUserMail="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_email' 'users' "users_ident = '$SeedboxUser'"`"
+			if [ "$UserToIgnore" != "$SeedboxUser" ]; then
+				SendMail "$Global_Subject_MonthlyPayment" "${SeedboxUser}" "new_user" "Changing Monthly"
+			fi
+		done
+	fi
+}
+
+#### Config Plugin FileUpload for users
+PluginFileUploadUsers() {
+	ListingUsers
+
+	if [ ! -z "$UsersList" ]; then
+		for FnUser in $UsersList; do
+			if [ ! -d $RutorrentDir/conf/users/$FnUser/fileupload ]; then
+				mkdir -p $RutorrentDir/conf/users/$FnUser/fileupload
+				if [ -f $RutorrentPluginsDir/fileupload/conf.php ] && [ ! -f $RutorrentDir/conf/users/$FnUser/fileupload/conf.php ]; then
+					cp $RutorrentPluginsDir/fileupload/conf.php $RutorrentDir/conf/users/$FnUser/fileupload/conf.php
+				fi
+			fi
+		done
+		chown -R www-data:www-data $RutorrentDir/conf/users/
+		chmod -R 0755 $RutorrentDir/conf/users/
+		find $RutorrentDir/conf/users/ -type f -print0 | xargs -0 chmod 0555
+	fi
+}
+
+##################### LAST LINE ######################################
