@@ -1,0 +1,1812 @@
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Include tools functions
+source $MySB_InstallDir/inc/funcs_sql
+source $MySB_InstallDir/inc/funcs_tools
+
+#### Crete '/etc/hosts' file
+CreateHostsFile() {
+	echo "127.0.0.1       localhost.localdomain localhost" > /etc/hosts
+	echo "$SrvIpAddress       $HostNameFQDN $(hostname -s)" >> /etc/hosts
+	echo "" >> /etc/hosts
+	echo "#### MySB - Force trackers resolution (ex: DNS liar)" >> /etc/hosts
+
+	Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list,tracker,tracker_domain' 'trackers_list' "1" | while read ROW; do
+		IdTracker="`echo $ROW | awk '{split($0,a,"|"); print a[1]}'`"
+		Tracker="`echo $ROW | awk '{split($0,a,"|"); print a[2]}'`"
+		TrackerDomain="`echo $ROW | awk '{split($0,a,"|"); print a[3]}'`"
+		TrackerIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'trackers_list_ipv4' "id_trackers_list = '$IdTracker'"`"
+
+		if [ ! -z "$TrackerIPv4" ]; then	
+			if [ "$Tracker" == "$TrackerDomain" ]; then
+				Lign="$TrackerDomain"
+			else
+				Lign="$Tracker, $TrackerDomain"
+			fi
+			for IPv4 in $TrackerIPv4; do
+				echo "$IPv4       $Lign" >> /etc/hosts
+			done
+		fi
+	done
+}
+
+#### Delete Bad Sources
+DeleteBadSources() {
+	if [ -z "$1" ]; then
+		SourcesFile="/etc/apt/sources.list"
+	else
+		SourcesFile="$MySB_InstallDir/files/fastest_mirrors"
+	fi
+
+	# Delete bad sources
+	sed -i '/debian.advalem.net/d' $SourcesFile
+	sed -i '/mirrors.e2wsolutions.com/d' $SourcesFile
+	sed -i '/debian.corenetworks.net/d' $SourcesFile
+	sed -i '/ftp.informatik.uni-frankfurt.de/d' $SourcesFile
+	sed -i '/archive.mmu.edu.my/d' $SourcesFile
+	sed -i '/debian.osdn.org.ua/d' $SourcesFile
+	sed -i '/ftp.kfki.hu/d' $SourcesFile
+	sed -i '/mirror.internap.com/d' $SourcesFile
+	sed -i '/mirrors.serverhost.ro/d' $SourcesFile
+	sed -i '/ftp.roedu.net/d' $SourcesFile
+	sed -i '/ftp.debian.nl/d' $SourcesFile
+	sed -i '/archive.mmu.edu.my/d' $SourcesFile
+	sed -i '/russell.cs.bilgi.edu.tr/d' $SourcesFile
+	sed -i '/pubmirrors.dal.corespace.com/d' $SourcesFile
+	sed -i '/mirror.thelinuxfix.com/d' $SourcesFile
+	sed -i '/mirrors.xenir.com/d' $SourcesFile
+	sed -i '/debian.intergenia.de/d' $SourcesFile
+	sed -i '/mirrors.nfsi.pt/d' $SourcesFile
+	sed -i '/debian.usthb.dz/d' $SourcesFile
+}
+
+#### Banner
+BannerGenerator() {
+	figlet MySB $MySB_CurrentVersion > $MySB_InstallDir/files/banner.tmp
+	echo "echo -e \"${CGREEN}############################################################$CEND" > $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+
+	NBLIGN=`wc -l $MySB_InstallDir/files/banner.tmp | awk '{ print $1 }'`
+	for (( lign=1; lign<=$NBLIGN; lign++ )); do
+		MYLIGN=`head -n $lign $MySB_InstallDir/files/banner.tmp | tail -n 1`
+		echo "${CGREEN}#$CEND	${CBLUE}$MYLIGN$CEND" >> $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	done
+	rm -f $MySB_InstallDir/files/banner.tmp
+
+	echo "${CGREEN}#$CEND		${CYELLOW}https://github.com/toulousain79/$CEND" >> $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	echo "${CGREEN}#$CEND" >> $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	if [ "`screen -ls | grep MySB`" == "" ]; then
+		echo "${CGREEN}#$CEND	$Header_CurrentFile ${CRED}$0$CEND" >> $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	fi
+	echo "${CGREEN}############################################################$CEND\"" >> $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	if [ -f $MySB_InstallDir/files/banner_$MySB_CurrentVersion ]; then
+		sed -i "s/,/ /g;" $MySB_InstallDir/files/banner_dev &> /dev/null
+		sed -i "s/\`/ /g;" $MySB_InstallDir/files/banner_dev &> /dev/null
+		clear
+		source $MySB_InstallDir/files/banner_$MySB_CurrentVersion
+	fi
+	echo
+}
+
+#### Send Mail
+SendMail() {
+	FnSubject="$1"
+	FnUser="$2"
+	FnCase="$3"
+	FnInfo="$4"
+	FnAttach=""
+	FnUserMail="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_email' 'users' "users_ident = '$FnUser'"`"
+	if [ ! -z "$FnInfo" ]; then log_daemon_msg "$Funcs_SendMail_GenerateHTML $FnUser"; fi
+
+	if ! GetPid nginx; then
+		service nginx restart &> /dev/null
+	fi
+
+	curl --silent --retry 2 --user $MySB_User:$MySB_Password "http://127.0.0.1:$Port_HTTP/UserInfoMail.php?case=$FnCase&user=$FnUser" > $MySB_InstallDir/temp/$FnUser.html
+
+	if [ ! -z "$FnInfo" ]; then StatusLSB; fi
+
+	if [ ! -z "$FnInfo" ]; then log_daemon_msg "$Funcs_SendMail_SendingEmail $FnUser ($FnInfo)"; fi
+	if [ -s $MySB_InstallDir/temp/$FnUser.html ]; then
+		FnAttach="$MySB_InstallDir/temp/$FnUser.html"
+		type="html"
+	else
+		type="plain"
+	fi
+
+	if [ -z "$FnAttach" ]; then
+		echo "" | mail -a "From: MySB <$MainUserEmail>" -a "MIME-Version: 1.0" -a "Content-Type: text/$type" -s "$FnSubject" $FnUserMail
+	else
+		cat $FnAttach | mail -a "From: MySB <$MainUserEmail>" -a "MIME-Version: 1.0" -a "Content-Type: text/$type" -s "$FnSubject" $FnUserMail
+	fi
+	sleep 2
+
+	#### Flush mail queue
+	if CheckCommand 0 postfix; then postfix flush; fi
+
+	if [ ! -z "$FnInfo" ]; then StatusLSB; fi
+
+	unset FnAttach FnInfo FnSubject FnUser
+}
+
+#### apt-get OR aptitude
+PackagesManage() {
+	Query=$1
+	PackageList=$2
+
+	if CheckCommand 0 aptitude; then
+		AptCommand="aptitude -q"
+	else
+		AptCommand="apt-get"
+	fi
+
+	GlobalArgs="-y --assume-yes"
+	RETURN=0
+	AptUpdate=0
+	tDiff=0
+
+	if [ "$IsReady_MySB_DB" == "YES" ]; then
+		AptUpdate="`Func_SQL_Command 'SELECT' 'MySB_db' 'apt_update' 'system' '1'`"
+		AptDate="`Func_SQL_Command 'SELECT' 'MySB_db' 'apt_date' 'system' '1'`"
+		AptDate=$(date -d "$AptDate" +"%Y-%m-%d %H")
+		Now=$(date +%Y-%m-%d\ %H)
+		t1=$(date --date="$AptDate" +'%-H')
+		t2=$(date --date="$Now" +'%-H')
+		let "tDiff=$t2-$t1"
+	fi
+	
+	#### Check last update
+	if [ "$Query" != "test" ]; then
+		if [ "$IsReady_MySB_DB" == "YES" ]; then
+			#### Need of 'apt-get update' ? (must be greater than 2 hours OR forced)
+			if [ "$AptUpdate" == "1" ] || [ "$tDiff" -gt "2" ] || [ "$Query" == "upgrade" ]; then
+				echo "$AptCommand $GlobalArgs -o Acquire::Check-Valid-Until=false update"
+				export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs -o Acquire::Check-Valid-Until=false update
+				if [ $? -eq 0 ]; then
+					Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "apt_update = 0, apt_date = 'NOW'" 'id_system = 1'
+				fi
+			fi
+		else
+			echo "$AptCommand $GlobalArgs -o Acquire::Check-Valid-Until=false update"
+			export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs -o Acquire::Check-Valid-Until=false update
+		fi
+	fi
+
+	case "$Query" in
+		"install")
+			FinalList=""
+			for Package in $PackageList; do
+				if ! CheckPackage $Package; then
+					FinalList="${FinalList} $Package"
+				fi
+			done
+			FinalList="`echo $FinalList | sed -e 's/^ //g;'`"
+
+			if [ ! -z "$FinalList" ]; then
+				echo "$AptCommand $GlobalArgs install $FinalList"
+				export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs -V install $FinalList
+			fi
+		;;
+		'upgrade')
+			if [ "`$AptCommand --help | grep safe-upgrade | awk '{ print $1 }'`" == "safe-upgrade" ]; then
+				echo "$AptCommand $GlobalArgs -V -o Dpkg::Options::="--force-confold" safe-upgrade"
+				export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs -V -o Dpkg::Options::="--force-confold" safe-upgrade
+			else
+				echo "$AptCommand $GlobalArgs -V -o Dpkg::Options::="--force-confold" upgrade"
+				export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs -V -o Dpkg::Options::="--force-confold" upgrade
+			fi
+		;;
+		'purge')
+			FinalList=""
+			for Package in $PackageList; do
+				if CheckPackage $Package; then
+					FinalList="${FinalList} $Package"
+				fi
+			done
+			FinalList="`echo $FinalList | sed -e 's/^ //g;'`"
+
+			if [ ! -z "$FinalList" ]; then
+				echo "$AptCommand $GlobalArgs purge $FinalList"
+				export DEBIAN_FRONTEND=noninteractive ; $AptCommand $GlobalArgs purge $FinalList
+			fi
+		;;
+		'test')
+			$AptCommand $GlobalArgs -o Acquire::Check-Valid-Until=false update > $MySB_InstallDir/temp/netselect-apt
+			case "$AptCommand" in
+				"aptitude -q")
+					Erreur="$Funcs_PackagesManage_Aptitude_0"
+					Ignore="$Funcs_PackagesManage_Aptitude_1"
+				;;
+				"apt-get")
+					Erreur="$Funcs_PackagesManage_AptGet_0"
+					Ignore="$Funcs_PackagesManage_AptGet_1"
+				;;
+			esac
+
+			if [ -f $MySB_InstallDir/temp/netselect-apt ]; then
+				MirrorsError="`cat $MySB_InstallDir/temp/netselect-apt | grep "^$Erreur" | awk '{ print $2 }'`"
+				for Mirror in $MirrorsError; do
+					sed -i '/'$Mirror'/d' $MySB_InstallDir/files/fastest_mirrors
+				done
+				MirrorsError="`cat $MySB_InstallDir/temp/netselect-apt | grep "^$Ignore" | awk '{ print $2 }'`"
+				for Mirror in $MirrorsError; do
+					sed -i '/'$Mirror'/d' $MySB_InstallDir/files/fastest_mirrors
+				done
+			fi
+		;;
+	esac
+
+	RETURN=$?
+
+	if [ "$Query" != "test" ]; then
+		if [ "$IsReady_MySB_DB" == "YES" ]; then
+			#### Need of cleaning ? (must be greater than 2 hours OR forced)
+			if [ "$AptUpdate" == "1" ] || [ "$tDiff" -gt "2" ]; then
+				if [ $RETURN -eq 0 ]; then
+					if [ "`$AptCommand --help | grep autoremove | awk '{ print $1 }'`" == "autoremove" ]; then
+						echo "$AptCommand $GlobalArgs autoremove"
+						$AptCommand $GlobalArgs autoremove
+					elif [ "`$AptCommand --help | grep autoclean | awk '{ print $1 }'`" == "autoclean" ]; then
+						echo "$AptCommand $GlobalArgs autoremove"
+						$AptCommand $GlobalArgs autoclean
+					fi
+
+					echo "$AptCommand $GlobalArgs install"
+					$AptCommand $GlobalArgs install
+				fi
+			fi
+		fi
+	fi
+
+	return $RETURN
+}
+
+#### If PeerGuardian is failing
+PeerGuardianFailed() {
+	ListingUsers
+	
+	for FnUser in $UsersList; do
+		log_daemon_msg "$Funcs_PeerGuardianFailed_Switching $1" "$FnUser"
+		case "$1" in
+			"rTorrent")
+				if [ ! -f $MySB_InstallDir/files/blocklists/blocklist_rtorrent.txt ]; then
+					ScriptInvoke 'ScreenSTD' "$MySB_InstallDir/scripts/BlocklistsRTorrent.bsh" 'REFRESH'
+				fi
+
+				if [ -f $MySB_InstallDir/files/blocklists/blocklist_rtorrent.txt ] && [ -d /home/$FnUser/blocklist/ ]; then
+					cp $MySB_InstallDir/files/blocklists/* /home/$FnUser/blocklist/
+				fi
+
+				if [ -f /home/$FnUser/.rtorrent.rc ]; then
+					perl -pi -e "s/^#ipv4_filter.load/ipv4_filter.load/g" /home/$FnUser/.rtorrent.rc
+					perl -pi -e "s/^#print/print/g" /home/$FnUser/.rtorrent.rc
+
+					service rtorrent-$FnUser status &> /dev/null
+					if [ $? -eq 0 ]; then
+						StatusLSB 0
+						service rtorrent-$FnUser restart
+					else
+						StatusLSB 0
+					fi
+				else
+					StatusLSB 0
+				fi
+			;;
+			"PeerGuardian")
+				if [ -f /home/$FnUser/.rtorrent.rc ]; then
+					Check="`cat /home/$FnUser/.rtorrent.rc | grep '^ipv4_filter.load'`"
+					if [ ! -z "$Check" ]; then
+						perl -pi -e "s/^ipv4_filter.load/#ipv4_filter.load/g" /home/$FnUser/.rtorrent.rc
+						perl -pi -e "s/^print/#print/g" /home/$FnUser/.rtorrent.rc
+
+						service rtorrent-$FnUser status &> /dev/null
+						if [ $? -eq 0 ]; then
+							StatusLSB 0
+							service rtorrent-$FnUser restart
+						else
+							StatusLSB 0
+						fi
+					else
+						StatusLSB 0
+					fi
+				else
+					StatusLSB 0
+				fi
+			;;
+		esac
+	done
+}
+
+#### Start/Stop services
+ManageServices() {
+	GlobalCommand="$1"
+	ServicesToManage="$2"
+	ServicesToManage="`echo $ServicesToManage | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+	if [ "$GlobalCommand" == "restart" ]; then
+		GlobalCommand="start"
+		FinalCommand="restart"
+	else
+		FinalCommand="reload"
+	fi
+
+	# Cleaning actual list of services
+	if [ ! -z "$ServicesToManage" ]; then
+		# Check if command exist
+		for Service in $ServicesToManage; do
+			if ! CheckCommand 0 $Service; then
+				ServicesToManage="`echo $ServicesToManage | sed -e 's/$Service//g;'`"
+			fi
+		done
+		ServicesToManage="`echo $ServicesToManage | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+	fi
+
+	if [ ! -z "$ServicesToManage" ]; then	
+		case "$LOGSTD" in
+			"STDOUT")
+				echo "---- "`date +"%T"` >> $MySB_InstallDir/logs/$ScriptName.log
+			;;
+		esac
+
+		for Service in $ServicesToManage; do
+			case "$GlobalCommand" in
+				"stop")
+					if GetPid $Service; then
+						Continue=1
+
+						case "$Service" in
+							"pglcmd")
+								Continue=0
+								log_daemon_msg "Stopping PeerGuardian Linux" "pglcmd"
+								pglcmd stop > /dev/null
+								StatusLSB
+							;;
+							"php5-fpm"|"nginx"|"stunnel4"|"vsftpd"|"fail2ban"|"nfs-kernel-server")
+								Continue=0
+								log_daemon_msg "Stopping $Service"
+								service $Service stop > /dev/null
+								StatusLSB
+							;;
+						esac
+
+						if [ "$Continue" == "1" ]; then
+							service $Service stop
+						fi
+					else
+						log_daemon_msg "Service already stopped" "$Service"
+						StatusLSB 0
+					fi
+				;;
+				"start")
+					if [ "$Service" == "pglcmd" ]; then
+						if CheckCommand 0 pglcmd; then
+							if GetPid $Service; then
+								log_daemon_msg "Restarting PeerGuardian Linux"
+								pglcmd restart > /dev/null
+								if [ $? -gt 0 ]; then
+									StatusLSB 1
+
+									log_daemon_msg "Force Restarting PeerGuardian Linux"
+									pglcmd force-restart > /dev/null
+								fi
+							else
+								log_daemon_msg "Starting PeerGuardian Linux"
+								pglcmd start > /dev/null
+							fi
+
+							if [ $? -gt 0 ]; then # if pgl don't start maybe its due to a list update
+								StatusLSB 1
+
+								case "$LOGSTD" in
+									"STDOUT")
+										echo `date +"%T"`" --> The updated list of PGL may have failed." >> $MySB_InstallDir/logs/$ScriptName.log
+										echo `date +"%T"`" --> Attempting to clean lists error." >> $MySB_InstallDir/logs/$ScriptName.log
+									;;
+								esac
+
+								CheckLog="`cat /var/log/pgl/pglcmd.log | grep failed | grep list.iblocklist.com | awk '{ print $6 }'`"
+								for List in $CheckLog; do
+									case "$LOGSTD" in
+										"STDOUT")
+											echo `date +"%T"`" --> '$List' will be disabled." >> $MySB_InstallDir/logs/$ScriptName.log
+										;;
+									esac
+
+									# Comment the list in '/etc/pgl/blocklists.list'
+									List=`echo $List | sed s,/,\\\\\\\\\\/,g`
+									sed -i "s/^$List/#$List/g" /etc/pgl/blocklists.list
+								done
+								log_daemon_msg "Force Restarting PeerGuardian Linux"
+								pglcmd restart > /dev/null
+
+								if [ $? -gt 0 ]; then # We have again a problem with PeerGuardian, test a force-restart
+									StatusLSB 1
+
+									log_daemon_msg "Force Restarting PeerGuardian Linux"
+									pglcmd force-restart > /dev/null
+									if [ $? -gt 0 ]; then # Again ??
+										StatusLSB 1
+										# We will use rTorrent Blocklist
+										PeerGuardianFailed "rTorrent"
+									else
+										StatusLSB 0
+										PeerGuardianFailed "PeerGuardian"
+									fi
+								else
+									StatusLSB 0
+									PeerGuardianFailed "PeerGuardian"
+								fi
+							else
+								StatusLSB 0
+								PeerGuardianFailed "PeerGuardian"
+							fi
+						else
+							echo "The command 'pglcmd' is not yet available..."
+						fi
+					else
+						Continue=1
+
+						case "$Service" in
+							"dnscrypt-proxy"|"webmin")
+								if GetPid $Service; then
+									FinalCommand="restart"
+								else
+									FinalCommand="start"
+								fi
+							;;
+							"fail2ban")
+								Continue=0
+								if ! GetPid $Service; then
+									log_daemon_msg "Starting $Service"
+									service $Service start > /dev/null
+								else
+									log_daemon_msg "Restarting $Service"
+									service $Service restart > /dev/null
+								fi
+								StatusLSB
+							;;
+							"php5-fpm"|"stunnel4"|"postfix"|"cron"|"vsftpd"|"nfs-kernel-server")
+								Continue=0
+								if CheckCommand 0 $Service; then
+									if ! GetPid $Service; then
+										log_daemon_msg "Starting $Service"
+										service $Service start > /dev/null
+									else
+										log_daemon_msg "Reloading $Service"
+										service $Service $FinalCommand > /dev/null
+										if [ $? -gt 0 ]; then
+											StatusLSB 1
+											log_daemon_msg "Restarting $Service"
+											service $Service restart > /dev/null
+										fi
+									fi
+									StatusLSB
+								fi
+							;;
+							"nginx")
+								Continue=0
+								if CheckCommand 0 $Service; then
+									if ! GetPid $Service; then
+										log_daemon_msg "Starting $Service"
+										service $Service start > /dev/null
+									else
+										log_daemon_msg "Reloading $Service"
+										service $Service $FinalCommand > /dev/null
+										if [ -z "`ps ax | grep 'nginx' | grep '/usr/sbin/nginx' | grep -v 'grep'`" ]; then
+											StatusLSB 1
+											log_daemon_msg "Killing $Service"
+											killall $Service
+											StatusLSB
+											log_daemon_msg "Starting $Service"
+											service $Service start > /dev/null
+										fi
+									fi
+									StatusLSB
+								fi
+							;;
+							"bind9")
+								Continue=0
+								if CheckCommand 0 $Service; then
+									if ! GetPid $Service; then
+										log_daemon_msg "Starting $Service"
+										service $Service start > /dev/null
+									else
+										log_daemon_msg "Reloading $Service"
+										service $Service $FinalCommand > /dev/null
+										if [ -z "`ps ax | grep 'named -u bind' | grep -v 'grep'`" ]; then
+											StatusLSB 1
+											log_daemon_msg "Restarting $Service"
+											service $Service restart > /dev/null
+										fi
+									fi
+									StatusLSB
+								fi
+							;;
+							*)
+								if ! GetPid $Service; then
+									FinalCommand="start"
+								else
+									FinalCommand="$FinalCommand"
+								fi
+							;;
+						esac
+
+						if [ "$Continue" == "1" ]; then
+							service $Service $FinalCommand
+
+							if [ $? -gt 0 ] && [ "$FinalCommand" == "reload" ]; then
+								service $Service restart
+							fi
+						fi
+					fi
+				;;
+			esac
+		done
+
+		case "$LOGSTD" in
+			"STDOUT")
+				echo "---- "`date +"%T"` >> $MySB_InstallDir/logs/$ScriptName.log
+			;;
+		esac
+	fi
+}
+
+#### Clean the rTorrent blocklist
+CleanBlockList() {
+	FILE="$2"
+	URL="$3"
+
+	case $1 in
+		download)
+			wget --no-check-certificate $URL -O $MySB_InstallDir/files/blocklists/$FILE.gz
+			if [ $? -eq 0 ] ; then
+				gzip -dc $MySB_InstallDir/files/blocklists/$FILE.gz | cut -d: -f2 > $MySB_InstallDir/files/blocklists/$FILE.txt
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'blocklists' "rtorrent_lastupdate = 'NOW'" "rtorrent_list = '$URL'"
+			else
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'blocklists' "rtorrent_lastupdate = 'failed'" "rtorrent_list = '$URL'"
+			fi
+		;;
+		del_spaces)
+			sed -i '/\ /d' $MySB_InstallDir/files/blocklists/$FILE.tmp
+		;;
+		not_numeric)
+			sed -i '/^[0123456789]/!d' $MySB_InstallDir/files/blocklists/$FILE.tmp
+		;;
+		not_cidr)
+			sed -i '/\//!d' $MySB_InstallDir/files/blocklists/$FILE.tmp
+		;;
+		del_RC)
+			sed -i '/^M/d' $MySB_InstallDir/files/blocklists/$FILE.tmp
+		;;
+		is_ip)
+			while read line; do
+				START=`echo $line | cut -d '-' -f 1`
+				END=`echo $line | cut -d '-' -f 2`
+				RESULT_START=`printf $START | grep -E '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'`
+				RESULT_END=`printf $END | grep -E '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'`
+				if [ ! "$RESULT_START" = "$START" ] || [ ! "$RESULT_END" = "$END" ]; then
+					sed -i '/$line/!d' $MySB_InstallDir/files/blocklists/$FILE.txt
+				fi
+			done < $MySB_InstallDir/files/blocklists/$FILE.txt
+		;;
+		sort_uniq)
+			sort -g $MySB_InstallDir/files/blocklists/$FILE.tmp | uniq > $MySB_InstallDir/files/blocklists/$FILE.txt
+			if [ -f $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp ]; then
+				rm -f $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+			fi
+		;;
+	esac
+}
+
+#### Any questions ?
+QuestionGetString() {
+	local ISPASSWORD=$1
+	local LABEL=$2
+	local RETURN=$3
+	local DEFAULT=$4
+	local NEWVAR1=a
+	local NEWVAR2=b
+	local YESYES=YESyes
+	local NONO=NOno
+	local YESNO=$YESYES$NONO
+
+	while [ ! $NEWVAR1 = $NEWVAR2 ] || [ -z "$NEWVAR1" ]; do
+		if [ "$ISPASSWORD" == "YES" ]; then	
+			echo -e -n "${CBLUE}$LABEL$CEND ${CBLACK}"
+			read NEWVAR1
+			echo -e -n "$CEND"
+		else
+			if [ -z "$DEFAULT" ]; then
+				echo -e -n "${CBLUE}$LABEL$CEND ${CGREEN}"
+				read NEWVAR1
+			else
+				echo -e -n "${CBLUE}$LABEL$CEND ${CYELLOW}$DEFAULT$CEND ${CGREEN}"
+				read NEWVAR1
+				if [ -z "$NEWVAR1" ]; then
+					NEWVAR1="$DEFAULT"
+				fi
+			fi
+			echo -e -n "$CEND"
+		fi
+		if [ -z "$NEWVAR1" ]; then
+			NEWVAR1=a
+			continue
+		fi
+
+		if [ ! -z "$DEFAULT" ]; then
+			if grep -q "$DEFAULT" <<< "$YESNO"; then
+				if grep -q "$NEWVAR1" <<< "$YESNO"; then
+					if grep -q "$NEWVAR1" <<< "$YESYES"; then
+						NEWVAR1=YES
+					else
+						NEWVAR1=NO
+					fi
+				else
+					NEWVAR1=a
+				fi
+			fi
+		fi
+
+		if [ "$NEWVAR1" == "$DEFAULT" ]; then
+			NEWVAR2=$NEWVAR1
+		else
+			if [ "$ISPASSWORD" == "YES" ]; then
+				echo -e -n "${CRED}$Global_Again $CEND${CBLACK}"
+				read NEWVAR2
+				echo -e -n "$CEND"
+			else
+				echo -e -n "${CRED}$Global_Again $CEND${CGREEN}"
+				read NEWVAR2
+				echo -e -n "$CEND"
+			fi
+			if [ -z "$NEWVAR2" ]; then
+				NEWVAR2=b
+				continue
+			fi
+		fi
+
+		if [ ! -z "$DEFAULT" ]; then
+			if grep -q "$DEFAULT" <<< "$YESNO"; then
+				if grep -q "$NEWVAR2" <<< "$YESNO"; then
+					if grep -q "$NEWVAR2" <<< "$YESYES"; then
+						NEWVAR2=YES
+					else
+						NEWVAR2=NO
+					fi
+				else
+					NEWVAR2=a
+				fi
+			fi
+		fi
+	done
+	eval $RETURN=\$NEWVAR1
+}
+
+#### Monthly payment
+MonthlyPayment() {
+	if [ ! -z "$RentingGlobalCost" ] && [ ! -z "$RentingTVA" ] && [ ! -z "$RentingModel" ]; then
+		log_daemon_msg "Calculate the monthly payment"
+		export LANG=""
+		CountingUsers
+		FnX=`echo "$RentingGlobalCost/$TotalUsers" | bc -l`
+		FnY=`echo "($FnX*$RentingTVA)/100" | bc -l`
+		PriceByUser=`echo "$FnX+$FnY" | bc -l`
+		PriceByUser=`printf '%.2f\n' $PriceByUser`
+		UserToIgnore="$1"
+
+		# add new renting info
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'renting' "model = '$RentingModel', tva = '$RentingTVA', global_cost = '$RentingGlobalCost', nb_users = '$TotalUsers', price_per_users = '$PriceByUser'" "id_renting = '1'"
+		StatusLSB
+
+		ListingUsers
+		for SeedboxUser in $UsersList; do
+			SeedUserMail="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_email' 'users' "users_ident = '$SeedboxUser'"`"
+			
+			if [ "$UserToIgnore" != "$SeedboxUser" ]; then	
+				SendMail "$Global_MonthlyPayment" "${SeedboxUser}" "new_user" "Changing Monthly"
+			fi
+		done
+	fi
+}
+
+#### Get ruTorrent Trackers
+GetRutorrentTrackers() {
+	FnAllEngines=$(ls -1r $RutorrentPluginsDir/extsearch/engines/)
+
+	for FnEngine in $FnAllEngines; do
+		Tracker=`cat $RutorrentPluginsDir/extsearch/engines/$FnEngine | grep "\$url" | grep "\=" | grep "http" | head -1 | sed 's/public//g;' | awk '{ print $3 }' | cut -d "/" -f 3 | cut -d "'" -f 1`
+		if [ ! -z "$Tracker" ]; then
+			AddTracker $Tracker "rutorrent"
+		fi
+		unset Tracker
+	done
+
+	unset FnAllEngines
+}
+
+#### Get Users Trackers
+GetUsersTrackers() {
+	FnUsersTrackers="`Func_SQL_Command 'SELECT' 'MySB_db' 'tracker' 'trackers_list' \"origin = 'users'\"`"
+	for FnTracker in $FnUsersTrackers; do
+		if [ ! -z "$FnTracker" ]; then
+			AddTracker $FnTracker "users"
+		fi
+	done
+	unset FnUsersTrackers
+}
+
+#### Add new trackers
+AddTracker() {
+	Tracker=$1
+	Origin=$2
+
+	if [ ! -z "$Tracker" ]; then
+		PART1="`echo ${Tracker} | cut -d "." -f 1`"
+		PART2="`echo ${Tracker} | cut -d "." -f 2`"
+		PART3="`echo ${Tracker} | cut -d "." -f 3`"
+
+		if [ -z "$PART3" ]; then
+			TrackerDomain="`echo $PART1`.`echo $PART2`"
+		else
+			TrackerDomain="`echo $PART2`.`echo $PART3`"
+		fi
+		unset PART1 PART2 PART3
+
+		if [ ! -z "$TrackerDomain" ]; then
+			DomainIPv4="$(nslookup $TrackerDomain | grep 'Address:' | awk '{ print $2 }' | tail -n +2)"
+			if [ ! -z "$DomainIPv4" ] && [ "$DomainIPv4" != "" ] && [ "$DomainIPv4" != "0.0.0.0" ] && [ "$DomainIPv4" != "127.0.0.1" ]; then
+				IfExist="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list' 'trackers_list' "tracker_domain = '$TrackerDomain'"`"
+				if [ -z $IfExist ]; then
+					log_daemon_msg "Add tracker domain : $TrackerDomain"
+					Func_SQL_Command 'INSERT' 'MySB_db' 'trackers_list' "tracker,tracker_domain,origin" "\"$TrackerDomain\",\"$TrackerDomain\",\"$Origin\""
+					StatusLSB
+				fi
+
+				TrackerIPv4="$(nslookup tracker.$TrackerDomain | grep 'Address:' | awk '{ print $2 }' | tail -n +2)"
+			else
+				IfExist="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list' 'trackers_list' "tracker_domain = '$TrackerDomain'"`"
+				if [ ! -z $IfExist ]; then
+					log_daemon_msg "Delete tracker domain : $TrackerDomain"
+					Func_SQL_Command 'DELETE' 'MySB_db' 'trackers_list' "tracker_domain = '$TrackerDomain'"
+					StatusLSB
+				fi
+			fi
+
+			if [ ! -z "$TrackerIPv4" ] && [ "$TrackerIPv4" != "" ] && [ "$TrackerIPv4" != "0.0.0.0" ] && [ "$TrackerIPv4" != "127.0.0.1" ]; then
+				TrackerIPv4="`echo $TrackerIPv4 | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+				TrackersListID="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list' 'trackers_list' "tracker_domain = '$TrackerDomain'"`"
+
+				if [ ! -z "$TrackersListID" ] && [ $TrackersListID -gt 0 ]; then
+					log_daemon_msg "Update trackers IPv4 for 'tracker.$TrackerDomain' --> '$TrackerIPv4'"
+					# Cleaning
+					ListIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'trackers_list_ipv4' "id_trackers_list = '$TrackersListID'"`"
+					for IPv4 in $ListIPv4; do
+						SEARCH="`echo "$TrackerIPv4" | grep "$IPv4"`"
+						if [ -z "$SEARCH" ]; then
+							Func_SQL_Command 'DELETE' 'MySB_db' 'trackers_list_ipv4' "ipv4 = '$IPv4' AND id_trackers_list = '$TrackersListID'"
+						fi
+					done
+					unset ListIPv4 IPv4
+
+					# Add
+					for IPv4 in $TrackerIPv4; do
+						IfExist="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list_ipv4' 'trackers_list_ipv4' "id_trackers_list = '$TrackersListID' AND ipv4 = '$IPv4'"`"
+						if [ -z $IfExist ]; then
+							Func_SQL_Command 'INSERT' 'MySB_db' 'trackers_list_ipv4' "id_trackers_list,ipv4" "\"$TrackersListID\",\"$IPv4\""
+						fi
+					done
+					unset IPv4 TrackerIPv4
+					Func_SQL_Command 'UPDATE' 'MySB_db' 'trackers_list' "tracker = 'tracker.$TrackerDomain'" "tracker_domain = '$TrackerDomain'"
+					StatusLSB
+				fi
+			else
+				if [ ! -z "$DomainIPv4" ] && [ "$DomainIPv4" != "0.0.0.0" ] && [ "$DomainIPv4" != "127.0.0.1" ]; then
+					DomainIPv4="`echo $DomainIPv4 | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+					TrackersListID="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list' 'trackers_list' "tracker_domain = '$TrackerDomain'"`"
+
+					if [ ! -z "$TrackersListID" ] && [ $TrackersListID -gt 0 ]; then
+						log_daemon_msg "Update trackers IPv4 for '$TrackerDomain' --> '$DomainIPv4'"
+						# Cleaning
+						ListIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'trackers_list_ipv4' \"id_trackers_list = '$TrackersListID'\"`"
+						for IPv4 in $ListIPv4; do
+							SEARCH="`echo "$DomainIPv4" | grep "$IPv4"`"
+							if [ -z "$SEARCH" ]; then
+								Func_SQL_Command 'DELETE' 'MySB_db' 'trackers_list_ipv4' "ipv4 = '$IPv4' AND id_trackers_list = '$TrackersListID'"
+							fi
+						done
+						unset ListIPv4 IPv4
+						# Add
+						for IPv4 in $DomainIPv4; do
+							IfExist="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list_ipv4' 'trackers_list_ipv4' "id_trackers_list = '$TrackersListID' AND ipv4 = '$IPv4'"`"
+							if [ -z $IfExist ]; then
+								Func_SQL_Command 'INSERT' 'MySB_db' 'trackers_list_ipv4' "id_trackers_list,ipv4" "\"$TrackersListID\",\"$IPv4\""
+							fi
+						done
+						unset IPv4 DomainIPv4
+						Func_SQL_Command 'UPDATE' 'MySB_db' 'trackers_list' "tracker = '$TrackerDomain'" "tracker_domain = '$TrackerDomain'"
+						StatusLSB
+					fi
+				fi
+			fi
+
+			unset TrackerDomain
+		fi
+	fi
+}
+
+#### Script Invocation
+ScriptInvoke() {
+	#### Use 'source' OR 'bash' OR 'screen' ?
+	METHOD=$1
+
+	#### Script to invoke
+	MYSCRIPT=$2
+	IFS=$'/'; i=0; for var in $MYSCRIPT; do (( i++ )); done; unset IFS
+	SCRIPT="`echo $MYSCRIPT | cut -d '/' -f $i`"
+
+	#### Arguments
+	Arguments=""
+	args=("$@")
+	for ((i=2; i < $#; i++)) {
+		Arguments="$Arguments ${args[$i]}"
+	}
+	Arguments="`echo $Arguments | sed -e 's/^ //g;' | sed -e 's/^ //g;'`"
+
+	#### Start invovation
+	case "$METHOD" in
+		"source"|"bash")
+			#### Prepare our script
+			# vars & funcs
+			echo "source $MySB_InstallDir/inc/vars" > $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked
+			# copy it
+			cat $MYSCRIPT >> $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked
+			# delete lign start with comments
+			sed -i '/^#/d' $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked
+			#delete includes before and after (on top and bottom of every script)
+			sed -i '/includes_before/d' $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked
+			sed -i '/includes_after/d' $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked
+			# Language
+			LoadLanguage "$SCRIPT"
+
+			$METHOD $MySB_InstallDir/temp/${ScriptName}_${SCRIPT}.invoked $Arguments
+		;;
+		"ScreenSTD"|"ScreenWAIT"|"InQueue")
+			screen -dmS ${ScriptName}_${SCRIPT} /bin/bash $MYSCRIPT $Arguments;
+
+			# Possibilities:
+			# 	ScreenSTD:	Waiting silently
+			# 	ScreenWAIT:	Waiting point to point
+			# 	InQueue:	No waiting...
+			case "$METHOD" in
+				"ScreenSTD")
+					WaitingSTD ${ScriptName}_${SCRIPT}
+				;;
+				"ScreenWAIT")
+					WaitingScreen ${ScriptName}_${SCRIPT}
+				;;
+			esac
+		;;
+	esac
+}
+
+#### Network ports generator
+NetworkPortsGenerator() {
+	WHITE_TCP_IN=""
+	WHITE_UDP_IN=""
+	WHITE_TCP_OUT="`Func_SQL_Command 'SELECT' 'MySB_db' 'white_tcp_port_out' 'vars' '1' | sed 's/,/ /g;'`"
+	WHITE_UDP_OUT="`Func_SQL_Command 'SELECT' 'MySB_db' 'white_udp_port_out' 'vars' '1' | sed 's/,/ /g;'`"
+
+	# TCP In
+	WHITE_TCP_IN="${Port_HTTPS}"
+	if [ "$IpRestriction" == "NO" ]; then
+		WHITE_TCP_IN="${WHITE_TCP_IN} ${Port_FTP} ${Port_SSH} ${Port_FTP_Data} ${Port_FTP_Passive}"
+	fi
+
+	# UDP In
+	if [ "$IpRestriction" == "NO" ]; then
+		WHITE_UDP_IN="${WHITE_UDP_IN}"
+	fi
+
+	# TCP Out
+	WHITE_TCP_OUT="${WHITE_TCP_OUT} ${SMTP_Port} ${Port_HTTPS} ${Port_FTP} ${Port_SSH} ${Port_FTP_Data} ${Port_FTP_Passive}"
+
+	# UDP Out
+	WHITE_UDP_OUT="${WHITE_UDP_OUT}"	
+
+	# Services
+	if [ "$IsInstalled_Webmin" == "YES" ] && [ "$IpRestriction" == "NO" ]; then
+		WHITE_TCP_IN="${WHITE_TCP_IN} ${Ports_Webmin}"
+	fi
+	if [ "$IsInstalled_PlexMedia" == "YES" ] && [ -f "/usr/lib/plexmediaserver/start.sh" ]; then
+		WHITE_TCP_IN="${WHITE_TCP_IN} ${Ports_TCP_PlexMedia}"
+	fi
+	if [ "$IsInstalled_OpenVPN" == "YES" ] && [ "$IpRestriction" == "NO" ]; then
+		case "$OpenVPN_Proto" in
+			"udp")
+				WHITE_UDP_IN="${WHITE_UDP_IN} ${Port_OpenVPN_WithGW} ${Port_OpenVPN_WithoutGW} ${Port_OpenVPN_TAP_WithoutGW}"
+			;;
+			"tcp")
+				WHITE_TCP_IN="${WHITE_TCP_IN} ${Port_OpenVPN_WithGW} ${Port_OpenVPN_WithoutGW} ${Port_OpenVPN_TAP_WithoutGW}"
+			;;
+		esac
+
+		# PlexMedia UDP ports opened only with OpenVPN installed
+		if [ "$IsInstalled_PlexMedia" == "YES" ] && [ -f "/usr/lib/plexmediaserver/start.sh" ]; then
+			UDP_PORTS_LIST="${WHITE_UDP_IN} ${Ports_UDP_PlexMedia}"
+		fi
+	fi	
+
+	WHITE_TCP_IN=`echo $WHITE_TCP_IN | sed -e 's/^ //g;' | sed 's/\s+$//'`
+	WHITE_UDP_IN=`echo $WHITE_UDP_IN | sed -e 's/^ //g;' | sed 's/\s+$//'`
+	WHITE_TCP_OUT=`echo $WHITE_TCP_OUT | sed -e 's/^ //g;' | sed 's/\s+$//'`
+	WHITE_UDP_OUT=`echo $WHITE_UDP_OUT | sed -e 's/^ //g;' | sed 's/\s+$//'`	
+}
+
+#### Fail2Ban White List
+Fail2BanWhitheList() {
+	if [ -f /etc/fail2ban/jail.local ]; then
+		Fail2banWhiteList=""
+		AllUsersIPs="${SeedboxUsersIPs} ${MainUserIPs}"
+		AllUsersIPs="`echo $AllUsersIPs | sed -e "s/^ //g;"`"
+
+		if [ $1 -eq 1 ]; then log_daemon_msg "$SecurityRules_Fail2Ban_IgnoreList"; fi
+		if [ "$IpRestriction" == "YES" ]; then
+			# All users IPs
+			for IPv4 in $AllUsersIPs; do
+				IfExist="`echo $Fail2banWhiteList | grep "$IPv4"`"
+				if [ -z "$IfExist" ]; then
+					Fail2banWhiteList="${Fail2banWhiteList} ${IPv4}"
+				fi
+			done
+			unset IPv4
+		fi
+
+		# VPN local IPs
+		if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+			for IPv4 in $VpnIPs; do
+				IfExist="`echo $Fail2banWhiteList | grep $IPv4`"
+				if [ -z "$IfExist" ]; then
+					Fail2banWhiteList="${Fail2banWhiteList} ${IPv4}"
+				fi
+			done
+			unset IPv4
+		fi
+
+		Fail2banWhiteList="`echo $Fail2banWhiteList | sed -e 's/^ //g;' | sed s,/,\\\\\\\\\\/,g`"
+		SEARCH="`cat /etc/fail2ban/jail.local | grep "ignoreip" | cut -d "=" -f 2 | sed -e 's/^ //g;' | sed s,/,\\\\\\\\\\/,g`"
+		if [ ! -z "$SEARCH" ]; then
+			perl -pi -e "s/$SEARCH/$Fail2banWhiteList/g" /etc/fail2ban/jail.local
+		else
+			NumLign=$(cat /etc/fail2ban/jail.local | grep 'ignoreip' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/ignoreip/d' /etc/fail2ban/jail.local
+			sed -i ""$NumLign"i\ignoreip        = $Fail2banWhiteList" /etc/fail2ban/jail.local
+		fi
+		unset SEARCH
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	fi
+}
+
+#### PeerGuardian Create blocklists.list
+PeerGuardianBlocklistsList() {
+	if [ -f /etc/pgl/pglcmd.conf ] && [ -f /etc/pgl/blocklists.list ]; then
+		# /etc/pgl/blocklists.list
+		if [ $1 -eq 1 ]; then log_daemon_msg "PeerGuardian - Adding the blocklists to use"; fi
+		(
+		cat <<'EOF'
+# blocklists.list - lists the blocklists that are handled automatically by pglcmd
+
+# Place one URL per line for every blocklist.
+# Any line which starts with a # (hash) is a comment and is ignored.
+
+# Have a look at /usr/share/doc/pglcmd/README.blocklists.gz for detailed
+# information about some available blocklists.
+
+# Instead or additionally to the blocklists that are specified in this file,
+# you can manually put lists in MASTER_BLOCKLIST_DIR (/var/lib/pgl).
+# All blocklists in that directory (except those which end in "~" or have a "."
+# prefix) are used by pgld. They may be in any supported format and have to be
+# either unpacked or gzipped. Note that these manually installed blocklists are
+# neither updated automatically, nore does IP_REMOVE work for them.
+
+# Do a "pglcmd reload" (or "restart" or "update") when you have edited
+# this file.
+
+EOF
+		) > /etc/pgl/blocklists.list
+
+		AllBlocklists="`Func_SQL_Command 'SELECT' 'MySB_db' 'peerguardian_list,peerguardian_active' 'blocklists' \"peerguardian_list != ''\"`"
+		for Blocklist in $AllBlocklists; do
+			List="`echo $Blocklist | awk '{split($0,a,"|"); print a[1]}'`"
+			IsActive="`echo $Blocklist | awk '{split($0,a,"|"); print a[2]}'`"
+
+			case "$2" in
+				'UpdateLists') # Update each list of PeerGuardian during installation
+					echo "$List" > /etc/pgl/blocklists.list # One to one list, the file 'blocklists.list' is created for each list for update them
+
+					pglcmd update
+
+					if [ $? -gt 0 ]; then # if update fail maybe its due to a bad list 
+						if [ $1 -eq 0 ]; then echo `date +"%T"`" --> The updated list of PGL may have failed." >> $MySB_InstallDir/logs/$ScriptName.log; fi
+
+						CheckLog="`cat /var/log/pgl/pglcmd.log | grep failed | grep list.iblocklist.com | awk '{ print $6 }'`"
+						for List in $CheckLog; do
+							echo `date +"%T"`" --> '$List' will be disabled." >> $MySB_InstallDir/logs/$ScriptName.log
+							# Force inactived list
+							Func_SQL_Command 'UPDATE' 'MySB_db' 'blocklists' "peerguardian_active = '0', peerguardian_lastupdate = 'failed'" "peerguardian_list = '$List'"
+						done
+					else # Update OK
+						Func_SQL_Command 'UPDATE' 'MySB_db' 'blocklists' "peerguardian_lastupdate = 'NOW'" "peerguardian_list = '$List'"
+					fi
+				;;
+				'CreateFile') # Now, we create the final blocklists with all active lists
+					case "$IsActive" in
+						'1')
+							echo "$List" >> /etc/pgl/blocklists.list
+						;;
+						'0')
+							echo "#$List" >> /etc/pgl/blocklists.list
+						;;
+					esac
+				;;
+			esac
+		done
+
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	fi
+}
+
+#### PeerGuardian Create allow.p2p
+PeerGuardianAllowP2P() {
+	if [ -f /etc/pgl/pglcmd.conf ] && [ -f /etc/pgl/allow.p2p ]; then
+		# /etc/pgl/allow.p2p
+		if [ $1 -eq 1 ]; then log_daemon_msg "PeerGuardian - Adding trackers to allow"; fi
+		(
+		cat <<'EOF'
+# allow.p2p - allow list for pglcmd
+#
+# This file contains IP ranges that shall not be checked.
+# They must be in the PeerGuardian .p2p text format like this:
+#   Some organization:1.0.0.0-1.255.255.255
+# This is also true if your blocklists are in another format.
+# Lines beginning with a hash (#) are comments and will be ignored.
+#
+# Do a "pglcmd restart" when you have edited this file.
+EOF
+		) > /etc/pgl/allow.p2p
+
+		# Allow all users
+		ListingUsers
+		if [ ! -z "$UsersList" ] && [ "$IpRestriction" == "YES" ]; then
+			echo "## Allow all MySB users" >> /etc/pgl/allow.p2p
+			for FnUser in $UsersList; do
+				UserID="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$FnUser'"`"
+				UserIP="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'users_addresses' "id_users = '$UserID'"`"
+				for IPv4 in $UserIP; do
+					echo "$FnUser:$IPv4-255.255.255.255" >> /etc/pgl/allow.p2p
+				done
+			done
+		fi
+
+		echo "## Trackers enabled" >> /etc/pgl/allow.p2p
+		AllTrackers="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list, tracker' 'trackers_list' \"is_active = '1'\"`"
+		for Tracker in $AllTrackers; do
+			IdTracker="`echo $Tracker | awk '{split($0,a,"|"); print a[1]}'`"
+			TrackerName="`echo $Tracker | awk '{split($0,a,"|"); print a[2]}'`"
+
+			ListIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'trackers_list_ipv4' "id_trackers_list = '$IdTracker'"`"
+			for IPv4 in $ListIPv4; do
+				echo "$TrackerName:$IPv4-255.255.255.255" >> /etc/pgl/allow.p2p
+			done
+		done
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	fi
+}
+
+#### PeerGuardian Create all needed iptables complementary rules
+PeerGuardianIptablesInsert() {
+	# Monitoring
+	if [ ! -z "$ServerProvider" ] && [ "$ServerProvider" != "$Global_NO" ]; then
+		if [ $1 -eq 1 ]; then log_daemon_msg "PeerGuardian - Adding of iptables complementary rules for $ServerProvider monitoring"; fi
+			echo "#!/bin/sh" > /etc/pgl/monitoring.insert.sh
+			echo >> /etc/pgl/monitoring.insert.sh
+			echo "# $ServerProvider monitoring complementary rules" >> /etc/pgl/monitoring.insert.sh
+			case "$ServerProvider" in
+				"OVH")
+					OvhIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'providers_monitoring' \"provider = 'OVH'\"`"
+					for IPv4 in $OvhIPv4; do
+						echo "iptables -A pgl_in -p udp -s $IPv4 --destination-port 6100:6200 -j RETURN -m comment --comment \"$ServerProvider monitoring\"" >> /etc/pgl/monitoring.insert.sh
+						echo "iptables -I pgl_in -p icmp -s $IPv4 -j RETURN -m comment --comment \"$ServerProvider monitoring\"" >> /etc/pgl/monitoring.insert.sh
+					done
+				;;
+				"ONLINE")
+					OnlineIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'providers_monitoring' \"provider = 'ONLINE'\"`"
+					for IPv4 in $OnlineIPv4; do
+						echo "iptables -I pgl_in -p icmp -s $IPv4 -j RETURN -m comment --comment \"$ServerProvider monitoring\"" >> /etc/pgl/monitoring.insert.sh
+					done
+				;;
+				"DIGICUBE")
+					OnlineIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'providers_monitoring' \"provider = 'DIGICUBE'\"`"
+					for IPv4 in $OnlineIPv4; do
+						echo "iptables -I pgl_in -p icmp -s $IPv4 -j RETURN -m comment --comment \"$ServerProvider monitoring\"" >> /etc/pgl/monitoring.insert.sh
+					done
+				;;
+			esac
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	else
+		if [ -f /etc/pgl/monitoring.insert.sh ]; then rm -f /etc/pgl/monitoring.insert.sh; fi
+	fi
+}
+
+#### PeerGuardian Create pglcmd.conf
+PeerGuardianPglcmdConf() {
+	if [ -f /etc/pgl/pglcmd.conf ]; then
+		if [ $1 -eq 1 ]; then log_daemon_msg "PeerGuardian - Logging and verbosity settings"; fi
+		STATS_MAILTO="`Func_SQL_Command 'SELECT' 'MySB_db' 'pgl_email_stats' 'system' '1' | sed 's/0//g;' | sed 's/1/root/g;'`"
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "STATS_MAILTO=")
+		perl -pi -e "s/$SEARCH/STATS_MAILTO=\"$STATS_MAILTO\"/g" /etc/pgl/pglcmd.conf
+		unset SEARCH
+
+		WD_MAILTO="`Func_SQL_Command 'SELECT' 'MySB_db' 'pgl_watchdog_email' 'system' '1' | sed 's/0//g;' | sed 's/1/root/g;'`"
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WD_MAILTO=")
+		perl -pi -e "s/$SEARCH/WD_MAILTO=\"$WD_MAILTO\"/g" /etc/pgl/pglcmd.conf
+		unset SEARCH
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+
+		if [ $1 -eq 1 ]; then log_daemon_msg "PeerGuardian - Adding of authorized IP addresses"; fi
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_IP_OUT=")
+		SEARCH="`echo $SEARCH | sed s,/,\\\\\\\\\\/,g`"
+		if [ ! -z "$SEARCH" ]; then
+			if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+				perl -pi -e "s/$SEARCH/WHITE_IP_OUT=\"10.0.0.0\/24\"/g" /etc/pgl/pglcmd.conf
+			else
+				perl -pi -e "s/$SEARCH/WHITE_IP_OUT=\"\"/g" /etc/pgl/pglcmd.conf
+			fi
+		fi
+		unset SEARCH
+
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_IP_FWD=")
+		SEARCH="`echo $SEARCH | sed s,/,\\\\\\\\\\/,g`"
+		if [ ! -z "$SEARCH" ]; then
+			if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+				perl -pi -e "s/$SEARCH/WHITE_IP_FWD=\"10.0.0.0\/24\"/g" /etc/pgl/pglcmd.conf
+			else
+				perl -pi -e "s/$SEARCH/WHITE_IP_FWD=\"\"/g" /etc/pgl/pglcmd.conf
+			fi
+		fi
+		unset SEARCH
+
+		NetworkPortsGenerator
+
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_TCP_IN=")
+		if [ ! -z "$SEARCH" ]; then	
+			perl -pi -e "s/$SEARCH/WHITE_TCP_IN=\"${WHITE_TCP_IN}\"/g" /etc/pgl/pglcmd.conf
+		fi
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_UDP_IN=")
+		if [ ! -z "$SEARCH" ]; then	
+			perl -pi -e "s/$SEARCH/WHITE_UDP_IN=\"${WHITE_UDP_IN}\"/g" /etc/pgl/pglcmd.conf
+		fi
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_TCP_OUT=")
+		if [ ! -z "$SEARCH" ]; then	
+			perl -pi -e "s/$SEARCH/WHITE_TCP_OUT=\"${WHITE_TCP_OUT}\"/g" /etc/pgl/pglcmd.conf
+		fi
+		SEARCH=$(cat /etc/pgl/pglcmd.conf | grep "WHITE_UDP_OUT=")
+		if [ ! -z "$SEARCH" ]; then
+			perl -pi -e "s/$SEARCH/WHITE_UDP_OUT=\"${WHITE_UDP_OUT}\"/g" /etc/pgl/pglcmd.conf
+		fi
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	fi
+}
+
+#### Manage directories, files and rights
+ManageDirectoriesAndFiles() {
+	#### Create missing directories
+	# Root Directories
+	if [ ! -d $MySB_InstallDir/db ]; then mkdir $MySB_InstallDir/db; fi
+	if [ ! -d $MySB_InstallDir/files ]; then mkdir $MySB_InstallDir/files; fi
+	if [ ! -d $MySB_InstallDir/logs/archives ]; then mkdir -p $MySB_InstallDir/logs/archives; fi
+	if [ ! -d $MySB_InstallDir/sources ]; then mkdir $MySB_InstallDir/sources; fi
+	if [ ! -d $MySB_InstallDir/ssl ]; then mkdir $MySB_InstallDir/ssl; fi
+	if [ ! -d $MySB_InstallDir/temp ]; then mkdir $MySB_InstallDir/temp; fi
+	if [ ! -d $MySB_InstallDir/web/openvpn ]; then mkdir -p $MySB_InstallDir/web/openvpn; fi
+	# Log directories
+	if [ ! -d $MySB_InstallDir/web/logs ]; then mkdir $MySB_InstallDir/web/logs; fi	
+	if [ ! -d $MySB_InstallDir/web/logs/bin ]; then mkdir $MySB_InstallDir/web/logs/bin; fi
+	if [ ! -d $MySB_InstallDir/web/logs/install ]; then mkdir $MySB_InstallDir/web/logs/install; fi
+	if [ ! -d $MySB_InstallDir/web/logs/nginx ]; then mkdir $MySB_InstallDir/web/logs/nginx; fi	
+	if [ ! -d $MySB_InstallDir/web/logs/scripts ]; then mkdir $MySB_InstallDir/web/logs/scripts; fi
+	if [ ! -d $MySB_InstallDir/web/logs/security ]; then mkdir $MySB_InstallDir/web/logs/security; fi
+	if [ ! -d $MySB_InstallDir/web/logs/upgrade ]; then mkdir $MySB_InstallDir/web/logs/upgrade; fi
+	if [ ! -d $MySB_InstallDir/web/logs/system ]; then mkdir $MySB_InstallDir/web/logs/system; fi
+
+	#### Convert with dos2unix
+	dos2unix $MySB_InstallDir/* &> /dev/null
+	dos2unix $MySB_InstallDir/bin/* &> /dev/null
+	dos2unix $MySB_InstallDir/files/* &> /dev/null
+	dos2unix $MySB_InstallDir/inc/* &> /dev/null
+	dos2unix $MySB_InstallDir/install/* &> /dev/null
+	dos2unix $MySB_InstallDir/scripts/* &> /dev/null
+	dos2unix $MySB_InstallDir/templates/* &> /dev/null
+	dos2unix $MySB_InstallDir/upgrade/* &> /dev/null
+
+	#### Change rights
+	# $MySB_InstallDir/
+	chmod -R 0700 $MySB_InstallDir
+	chmod 0755 $MySB_InstallDir
+	chown -R root:root $MySB_InstallDir
+	# $MySB_InstallDir/db
+	chmod 0770 $MySB_InstallDir/db
+	chmod 0660 $MySB_InstallDir/db/* &> /dev/null
+	chown -R root:www-data $MySB_InstallDir/db
+	# $MySB_InstallDir/ssl
+	chmod 0644 $MySB_InstallDir/ssl/*.cert &> /dev/null
+	# $MySB_InstallDir/install
+	chmod -R 0755 $MySB_InstallDir/install
+	# $MySB_InstallDir/temp
+	chown root:www-data $MySB_InstallDir/temp
+	chmod 0760 $MySB_InstallDir/temp
+	# $MySB_InstallDir/web
+	chown -R root:www-data $MySB_InstallDir/web
+	chown root:root $MySB_InstallDir/web
+	chmod -R 0640 $MySB_InstallDir/web
+	find $MySB_InstallDir/web -type d -iname "*" -print0 | xargs -I {} -0 chmod 0750 {}
+	chmod 0755 $MySB_InstallDir/web
+	# $MySB_InstallDir/web/openvpn
+	if [ -d $MySB_InstallDir/web/openvpn ]; then chmod 0770 $MySB_InstallDir/web/openvpn; fi
+	# /home/MySB_share
+	chown root:MySB_users /home/MySB_share
+	chmod 0770 /home/MySB_share
+
+	# Config files
+	if [ -f /etc/MySB/config ]; then
+		chown root:root /etc/MySB/config
+		chmod 0640 /etc/MySB/config
+	fi
+	if [ -f /etc/MySB/config_db ]; then
+		chown root:root /etc/MySB/config_db
+		chmod 0640 /etc/MySB/config_db
+	fi
+	if [ -f /etc/MySB/config.php ]; then
+		chmod 0640 /etc/MySB/config.php
+		chown root:www-data /etc/MySB/config.php
+	fi
+
+	# LoadAvg
+	if [ ! -z "$LoadAvgDir" ]; then
+		if [ -f $LoadAvgDir/configure ]; then chmod 0640 $LoadAvgDir/configure; fi
+		if [ ! -d $LoadAvgDir/logs ] && [ -d $LoadAvgDir ]; then mkdir $LoadAvgDir/logs; fi
+		if [ -d $LoadAvgDir/logs ]; then chmod 0777 $LoadAvgDir/logs; fi
+	fi
+
+	# ownCloud
+	if [ ! -z "$ownCloudDir" ] && [ -d $ownCloudDir ]; then
+		find $ownCloudDir/ -type f -print0 | xargs -0 chmod 0640
+		find $ownCloudDir/ -type d -print0 | xargs -0 chmod 0750
+		chmod 0750 $ownCloudDir/occ
+		chown -R root:www-data $ownCloudDir/
+		chown -R www-data:www-data $ownCloudDir/apps/
+		chown -R www-data:www-data $ownCloudDir/config/
+		chown -R www-data:www-data $ownCloudDir/themes/
+		if [ ! -d /home/owncloud ]; then mkdir -p /home/owncloud; fi
+		if [ ! -f /home/owncloud/.ocdata ]; then touch /home/owncloud/.ocdata; fi
+		if [ ! -f /home/owncloud/index.html ]; then touch /home/owncloud/index.html; fi
+		if [ ! -d /home/owncloud/admin/files ]; then mkdir -p /home/owncloud/admin/files; fi
+		if [ -f /home/owncloud/mount.json ]; then chmod 0640 /home/owncloud/mount.json; fi
+		chown -R www-data:www-data /home/owncloud
+		chown www-data:root /home/owncloud
+	fi
+
+	# ruTorrent Global Config
+	if [ ! -z "$RutorrentDir" ] && [ -d $RutorrentDir ]; then
+		ruTorrentGlobalConfigs
+	fi
+
+	# Users
+	if [ "$IsReady_MySB_DB" == "YES" ]; then
+		ListingUsers
+		if [ ! -z "$UsersList" ]; then
+			for FnUser in $UsersList; do
+				if [ ! -z "`getent passwd $FnUser`" ]; then
+					# Home
+					ManageUserHomeDir "$FnUser"
+
+					# ruTorrent
+					if [ ! -z "$RutorrentDir" ] && [ -d $RutorrentPluginsDir ]; then
+						ruTorrentUsersConfigs "$FnUser"
+					fi
+
+					# Seedbox-Manager
+					ManagerUsersConfigs "$FnUser"
+
+					# Cakebox-Light
+					CakeboxUsersConfigs "$FnUser"
+				fi
+			done
+		fi
+	fi
+
+	# ruTorrent
+	if [ ! -z "$RutorrentDir" ] && [ -d $RutorrentDir ]; then
+		if [ -d $RutorrentDir ]; then chmod -R 0755 $RutorrentDir; fi
+		if [ -d $RutorrentDir ]; then chown -R www-data:www-data $RutorrentDir; fi
+		if [ -d $RutorrentDir/share ]; then
+			find $RutorrentDir/share/ -type d -exec chmod 0777 {} \;
+			find $RutorrentDir/share/ -type f -exec chmod 0666 {} \;
+		fi
+		if [ -d $RutorrentPluginsDir/fileupload/scripts/upload ]; then chmod 0775 $RutorrentPluginsDir/fileupload/scripts/upload; fi
+	fi
+
+	# Seedbox-Manager
+	if [ ! -z "$ManagerDir" ] && [ -d $ManagerDir ]; then
+		if [ -d $ManagerDir ]; then chown -R www-data:www-data $ManagerDir; fi
+		if [ -f $ManagerDir/reboot-rtorrent ]; then
+			chown root:root $ManagerDir/reboot-rtorrent
+			chmod 4755 $ManagerDir/reboot-rtorrent
+		fi
+	fi
+}
+
+#### Change rights for users
+ManageUserHomeDir() {
+	FnUser="$1"
+	FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+
+	#### Create missing directories
+	if [ ! -d $FnHomeDir ]; then mkdir $FnHomeDir; fi # /home/user
+	if [ ! -d $FnHomeDir/blocklist ]; then mkdir $FnHomeDir/blocklist; fi # /home/user/blocklist
+	if [ ! -d $FnHomeDir/logs ]; then mkdir $FnHomeDir/logs; fi # /home/user/logs
+	if [ ! -d $FnHomeDir/rtorrent ]; then mkdir $FnHomeDir/rtorrent; fi # /home/user/rtorrent
+	if [ ! -d $FnHomeDir/rtorrent/watch ]; then mkdir $FnHomeDir/rtorrent/watch; fi # /home/user/rtorrent/watch
+	if [ ! -d $FnHomeDir/rtorrent/incomplete ]; then mkdir $FnHomeDir/rtorrent/incomplete; fi # /home/user/rtorrent/incomplete
+	if [ ! -d $FnHomeDir/rtorrent/complete ]; then mkdir $FnHomeDir/rtorrent/complete; fi # /home/user/rtorrent/complete
+	if [ ! -d $FnHomeDir/rtorrent/.session ]; then mkdir $FnHomeDir/rtorrent/.session; fi # /home/user/rtorrent/.session
+	if [ ! -d $FnHomeDir/rtorrent/torrents ]; then mkdir $FnHomeDir/rtorrent/torrents; fi # /home/user/rtorrent/torrents
+	if [ ! -d $FnHomeDir/rtorrent/share ]; then mkdir $FnHomeDir/rtorrent/share; fi # /home/user/rtorrent/share
+
+	#### Change rights and owners
+	# /home/user
+	chown root:root $FnHomeDir
+	chmod 0755 $FnHomeDir
+
+	# .bashrc, .bash_logout, .profile, .rtorrent.rc: O:rwx G:r-- O:---
+	if [ -f $FnHomeDir/.rtorrent.rc* ]; then
+		chown root:$FnUser $FnHomeDir/.rtorrent.rc*
+		chmod 0740 $FnHomeDir/.rtorrent.rc*
+	fi
+	if [ -f $FnHomeDir/.bashrc ]; then
+		chown root:$FnUser $FnHomeDir/.bashrc
+		chmod 0740 $FnHomeDir/.bashrc
+	fi
+	if [ -f $FnHomeDir/.bash_logout ]; then
+		chown root:$FnUser $FnHomeDir/.bash_logout
+		chmod 0740 $FnHomeDir/.bash_logout
+	fi
+	if [ -f $FnHomeDir/.profile ]; then
+		chown root:$FnUser $FnHomeDir/.profile
+		chmod 0740 $FnHomeDir/.profile
+	fi
+
+	# /home/user/blocklist
+	# chmod -R 0740 $FnHomeDir/blocklist
+	# chmod 0754 $FnHomeDir/blocklist
+	chmod -R 0755 $FnHomeDir/blocklist	
+	chown -R root:$FnUser $FnHomeDir/blocklist
+	# /home/user/logs
+	#chmod -R 0774 $FnHomeDir/logs
+	chmod -R 0775 $FnHomeDir/logs
+	chown -R root:$FnUser $FnHomeDir/logs
+	# /home/user/rtorrent
+	chown root:$FnUser $FnHomeDir/rtorrent
+	chmod 0775 $FnHomeDir/rtorrent
+	# /home/user/rtorrent/watch
+	#chown root:$FnUser $FnHomeDir/rtorrent/watch
+	#chmod 0774 $FnHomeDir/rtorrent/watch
+	chown root:MySB_users $FnHomeDir/rtorrent/watch
+	chmod 0770 $FnHomeDir/rtorrent/watch
+	# /home/user/rtorrent/incomplete
+	chown root:$FnUser $FnHomeDir/rtorrent/incomplete
+	chmod 0775 $FnHomeDir/rtorrent/incomplete
+	# /home/user/rtorrent/complete
+	chown root:$FnUser $FnHomeDir/rtorrent/complete
+	chmod 0775 $FnHomeDir/rtorrent/complete
+	# /home/user/rtorrent/.session
+	chown -R root:$FnUser $FnHomeDir/rtorrent/.session
+	chmod 0771 $FnHomeDir/rtorrent/.session
+	# /home/user/rtorrent/share
+	# chown root:MySB_users $FnHomeDir/rtorrent/share
+	# chmod 0770 $FnHomeDir/rtorrent/share
+
+	unset FnHomeDir
+}
+
+#### Cakebox-Light Users Config
+CakeboxUsersConfigs() {
+	if [ "$IsInstalled_Cakebox" == "YES" ] && [ -d $CakeboxDir ]; then
+		FnUser="$1"
+		FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+		HomeDirEscaped=`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`
+
+		if [ -f $CakeboxDir/config/default.php.dist ] && [ ! -f  $CakeboxDir/config/$FnUser.php ]; then
+			cp $CakeboxDir/config/default.php.dist $CakeboxDir/config/$FnUser.php
+			sed -i "s/\/var\/www\//$HomeDirEscaped\/rtorrent\//g;" $CakeboxDir/config/$FnUser.php
+			sed -i "s/\/access\//\/$FnUser\/rtorrent\//g;" $CakeboxDir/config/$FnUser.php
+			case "$EnvLang" in
+				"fr")
+					perl -pi -e "s/\"en\"/\"$EnvLang\"/g" $CakeboxDir/config/$FnUser.php
+				;;
+				"en")
+					perl -pi -e "s/\"fr\"/\"$EnvLang\"/g" $CakeboxDir/config/$FnUser.php
+				;;
+			esac
+			sed -i "s/\"html5\"/\"divx\"/g;" $CakeboxDir/config/$FnUser.php
+		fi
+
+		if [ -f  $CakeboxDir/config/$FnUser.php ]; then
+			chown root:www-data $CakeboxDir/config/$FnUser.php
+			chmod 0660 $CakeboxDir/config/$FnUser.php
+		fi
+
+		unset FnHomeDir HomeDirEscaped
+	fi
+}
+
+#### Seedbox-Manager Users Config
+ManagerUsersConfigs() {
+	if [ "$IsInstalled_Manager" == "YES" ]; then
+		FnUser="$1"
+		FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+		HomeDirEscaped=`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`
+		PortSCGI="`Func_SQL_Command 'SELECT' 'MySB_db' 'scgi_port' 'users' "users_ident = '$FnUser'"`"
+		UserNameUpper=`echo $FnUser | tr '[:lower:]' '[:upper:]'`	
+
+		if [ ! -d $ManagerDir/conf/users/$FnUser ]; then mkdir -p $ManagerDir/conf/users/$FnUser; fi
+		if [ -f $ManagerDir/conf/config.ini ] && [ ! -f $ManagerDir/conf/users/$FnUser/config.ini ]; then
+			cp $ManagerDir/conf/config.ini $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/user_directory = \"\/\"/user_directory = \"$HomeDirEscaped\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/scgi_folder = \"\/RPC1\"/scgi_folder = \"\/$UserNameUpper\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/rutorrent.domaine.fr, name = rutorrent/https:\/\/$HostNameFQDN:$Port_HTTPS\/ru, name = ruTorrent/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/cakebox.domaine.fr, name = cakebox/https:\/\/$HostNameFQDN:$Port_HTTPS, name = MySB Portal/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/port_ftp = \"21\"/port_ftp = \"$Port_FTP\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/port_sftp = \"22\"/port_sftp = \"$Port_SSH\"/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/contact@exemple.com/$MainUserEmail/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			sed -i "s/http:\/\/mondedie.fr/http:\/\/www.google.fr/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			if [ "$MainUser" == "$FnUser" ]; then	
+				sed -i "s/owner = no/owner = yes/g;" $ManagerDir/conf/users/$FnUser/config.ini
+			fi
+		fi
+
+		unset FnHomeDir HomeDirEscaped PortSCGI UserNameUpper
+	fi
+}
+
+#### ruTorrent Global config
+ruTorrentGlobalConfigs() {
+	LISTING=$(ls -1r $RutorrentPluginsDir/)
+	ListingUsers
+
+	if [ -f $RutorrentDir/conf/config.php ]; then
+		# Alter 'config.php' for general use
+		perl -pi -e "s/$topDirectory = '\/';/$topDirectory = '\/home';/g" $RutorrentDir/conf/config.php
+		sed -i "/\"php\"/s/'',/'\/usr\/bin\/php',/g" $RutorrentDir/conf/config.php
+		sed -i "/\"curl\"/s/'',/'\/usr\/bin\/curl',/g" $RutorrentDir/conf/config.php
+		sed -i "/\"gzip\"/s/'',/'\/bin\/gzip',/g" $RutorrentDir/conf/config.php
+		sed -i "/\"id\"/s/'',/'\/usr\/bin\/id',/g" $RutorrentDir/conf/config.php
+		sed -i "/\"stat\"/s/'',/'\/usr\/bin\/stat',/g" $RutorrentDir/conf/config.php
+	fi
+
+	for Plugin in $LISTING; do
+		case "$Plugin" in
+			'cpuload')
+				if [ -f $RutorrentPluginsDir/cpuload/conf.php ]; then
+					perl -pi -e "s/$processorsCount = null;/$processorsCount = $PROCESSOR;/g" $RutorrentPluginsDir/cpuload/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'create')
+				if [ -f $RutorrentPluginsDir/create/conf.php ]; then
+					perl -pi -e "s/$useExternal = false;/$useExternal = 'buildtorrent';/g" $RutorrentPluginsDir/create/conf.php
+					sed -i "/pathToCreatetorrent/s/'';/'\/usr\/bin\/buildtorrent';/g" $RutorrentPluginsDir/create/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'diskspace')
+				if [ -f $RutorrentPluginsDir/diskspace/conf.php ]; then
+					perl -pi -e "s/$notifySpaceLimit = 512;/$notifySpaceLimit = 4096;/g" $RutorrentPluginsDir/diskspace/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'filemanager')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileManager'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/filemanager/conf.php ]; then
+						sed -i "/'rar'/s/'';/'\/usr\/bin\/rar';/g" $RutorrentPluginsDir/filemanager/conf.php
+						sed -i "/'zip'/s/'';/'\/usr\/bin\/zip';/g" $RutorrentPluginsDir/filemanager/conf.php
+						sed -i "/'unzip'/s/'';/'\/usr\/bin\/unzip';/g" $RutorrentPluginsDir/filemanager/conf.php
+						sed -i "/'tar'/s/'';/'\/bin\/tar';/g" $RutorrentPluginsDir/filemanager/conf.php
+						if [ "`cat $RutorrentPluginsDir/filemanager/conf.php | grep "$pathToExternals\['bzip2'\]"`" == "" ]; then
+							NumLign=$(sed -n "/'\/bin\/tar'/=" $RutorrentPluginsDir/filemanager/conf.php)
+							(( NumLign++ ))
+							sed -i "${NumLign}i\$pathToExternals['bzip2'] = '\/bin\/bzip2';" $RutorrentPluginsDir/filemanager/conf.php
+						fi
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/filemanager"
+				fi
+				unset IsActive
+			;;
+			'fileshare')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileShare'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/fileshare/conf.php ]; then
+						sed -i "/'duration'/s/1;/0;/g" $RutorrentPluginsDir/fileshare/conf.php
+						perl -pi -e "s/http:\/\/robits.org\/rutorrent\/share.php/https:\/\/$HostNameFQDN:$Port_HTTPS\/fileshare.php/g" $RutorrentPluginsDir/fileshare/conf.php
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/fileshare"
+				fi
+				unset IsActive
+			;;
+			'fileupload')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileUpload'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/fileupload/conf.php ]; then
+						if [ ! -z "$UsersList" ]; then
+							for FnUser in $UsersList; do
+								if [ ! -d $RutorrentDir/conf/users/$FnUser/$Plugin ]; then
+									mkdir -p $RutorrentDir/conf/users/$FnUser/$Plugin
+									if [ -f $RutorrentPluginsDir/fileupload/conf.php ] && [ ! -f $RutorrentDir/conf/users/$FnUser/fileupload/conf.php ]; then
+										cp $RutorrentPluginsDir/fileupload/conf.php $RutorrentDir/conf/users/$FnUser/fileupload/conf.php
+									fi
+								fi
+							done
+						fi
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/fileupload"			
+				fi
+				unset IsActive
+			;;
+			'geoip')
+				if [ -f $RutorrentPluginsDir/geoip/conf.php ]; then
+					perl -pi -e "s/$dnsResolver = '8.8.8.8';/$dnsResolver = null;/g" $RutorrentPluginsDir/geoip/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'linkcakebox')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin Link Cakebox'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/linkcakebox/conf.php ]; then
+						NumLign=$(sed -n "/\$url =/=" $RutorrentPluginsDir/linkcakebox/conf.php)
+						sed -i '/$url =/d' $RutorrentPluginsDir/linkcakebox/conf.php
+						sed -i "${NumLign}i\$url = 'https:\/\/$HostNameFQDN:$Port_HTTPS\/cb\/';" $RutorrentPluginsDir/linkcakebox/conf.php
+						perl -pi -e "s/\/torrents\//\/rtorrent\//g" $RutorrentPluginsDir/linkcakebox/conf.php
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/linkcakebox"
+				fi
+				unset IsActive
+			;;
+			'linkseedboxmanager')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin Link Manager'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/linkseedboxmanager/conf.php ]; then
+						perl -pi -e "s/http:\/\/seedbox-manager.ndd.tld/https:\/\/$HostNameFQDN:$Port_HTTPS\/sm\//g" $RutorrentPluginsDir/linkseedboxmanager/conf.php
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/linkseedboxmanager"
+				fi
+				unset IsActive
+			;;
+			'logoff')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin Logoff'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/logoff/conf.php ]; then
+						perl -pi -e "s/scars,user1,user2//g" $RutorrentPluginsDir/logoff/conf.php
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/logoff"
+				fi
+				unset IsActive
+			;;
+			'mediainfo')
+				if [ -f $RutorrentPluginsDir/mediainfo/conf.php ]; then
+					sed -i "/'mediainfo'/s/'';/'\/usr\/bin\/mediainfo';/g" $RutorrentPluginsDir/mediainfo/conf.php
+					perl -pi -e "s/scars,user1,user2//g" $RutorrentPluginsDir/mediainfo/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'mediastream')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin MediaStream'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/mediastream/conf.php ]; then
+						perl -pi -e "s/http:\/\/mydomain.com\/stream\/view.php/https:\/\/$HostNameFQDN:$Port_HTTPS\/view.php/g" $RutorrentPluginsDir/mediastream/conf.php
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/mediastream"
+				fi
+				unset IsActive
+			;;
+			'screenshots')
+				if [ -f $RutorrentPluginsDir/screenshots/conf.php ]; then
+					sed -i "/'ffmpeg'/s/'';/'\/usr\/bin\/ffmpeg';/g" $RutorrentPluginsDir/screenshots/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'stream')
+				IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin Stream'\"`"
+				if [ $IsActive -eq 1 ]; then
+					if [ -f $RutorrentPluginsDir/stream/config.php ]; then
+						NumLign=$(sed -n "/\$username =/=" $RutorrentPluginsDir/stream/config.php)
+						if [ -z "$(sed -n "/\$username =/=" $RutorrentPluginsDir/stream/config.php)" ]; then
+							NumLign=$(sed -n "/\$auth =/=" $RutorrentPluginsDir/stream/config.php)
+							sed -i "${NumLign}i\$username = \$_SERVER['PHP_AUTH_USER'];" $RutorrentPluginsDir/stream/config.php
+						fi
+						NumLign=$(sed -n "/\$password =/=" $RutorrentPluginsDir/stream/config.php)
+						if [ -z "$NumLign" ]; then
+							NumLign=$(sed -n "/\$auth =/=" $RutorrentPluginsDir/stream/config.php)
+							sed -i "${NumLign}i\$password = \$_SERVER['PHP_AUTH_PW'];" $RutorrentPluginsDir/stream/config.php
+						fi
+						if [ -z "` cat $RutorrentPluginsDir/stream/config.php | grep '$auth = "$username:$password";'`" ]; then
+							NumLign=$(sed -n "/\$auth =/=" $RutorrentPluginsDir/stream/config.php)
+							sed -i '/$auth =/d' $RutorrentPluginsDir/stream/config.php
+							NumLign=$(( NumLign+2 ))
+							sed -i "${NumLign}i\$auth = \"\$username:\$password\";" $RutorrentPluginsDir/stream/config.php
+						fi
+						perl -pi -e "s/define\('USE_NGINX', false\);/define\('USE_NGINX', true\);/g" $RutorrentPluginsDir/stream/config.php
+						perl -pi -e "s/define\('SCHEME', 'http'\);/define\('SCHEME', 'https'\);/g" $RutorrentPluginsDir/stream/config.php
+					else
+						echo "Plugin $Plugin missing"
+					fi
+				else
+					DeleteDirectory 0 "$RutorrentPluginsDir/stream"
+				fi
+				unset IsActive
+			;;
+			'theme')
+				if [ -f $RutorrentPluginsDir/stream/config.php ]; then
+					perl -pi -e "s/$defaultTheme = \"\";/$defaultTheme = \"Oblivion\";/g" $RutorrentPluginsDir/theme/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+			'unpack')
+				if [ -f $RutorrentPluginsDir/unpack/conf.php ]; then
+					sed -i "/'unzip'/s/'';/'\/usr\/bin\/unzip';/g" $RutorrentPluginsDir/unpack/conf.php
+					sed -i "/'unrar'/s/'';/'\/usr\/bin\/unrar';/g" $RutorrentPluginsDir/unpack/conf.php
+				else
+					echo "Plugin $Plugin missing"
+				fi
+			;;
+		esac
+	done
+}
+
+#### ruTorrent Users Config and Plugins
+ruTorrentUsersConfigs() {
+	LISTING=$(ls -1r $RutorrentPluginsDir/)
+	FnUser="$1"
+	FnHomeDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'home_dir' 'users' "users_ident = '$FnUser'"`"
+	HomeDirEscaped="`echo $FnHomeDir | sed s,/,\\\\\\\\\\/,g`"
+	PortSCGI="`Func_SQL_Command 'SELECT' 'MySB_db' 'scgi_port' 'users' "users_ident = '$FnUser'"`"
+	UserNameUpper="`echo $FnUser | tr '[:lower:]' '[:upper:]'`"
+
+	# share
+	if [ ! -d $RutorrentDir/share/users/$FnUser/settings/ ]; then mkdir -p $RutorrentDir/share/users/$FnUser/settings/; fi
+	if [ ! -d $RutorrentDir/share/users/$FnUser/torrents/ ]; then mkdir -p $RutorrentDir/share/users/$FnUser/torrents/; fi
+
+	# conf
+	if [ ! -d $RutorrentDir/conf/users/$FnUser/ ]; then mkdir -p $RutorrentDir/conf/users/$FnUser/; fi
+	if [ -f $RutorrentDir/conf/config.php ]; then
+		cp $RutorrentDir/conf/config.php $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/$topDirectory = '\/home';/$topDirectory = '$HomeDirEscaped\/rtorrent';/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/$log_file = '\/tmp\/errors.log';/$log_file = '$HomeDirEscaped\/logs\/rutorrent.log';/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/RPC2/$UserNameUpper/g" $RutorrentDir/conf/users/$FnUser/config.php
+		perl -pi -e "s/5000/$PortSCGI/g" $RutorrentDir/conf/users/$FnUser/config.php
+	fi
+	if [ -f $RutorrentDir/conf/access.ini ]; then cp $RutorrentDir/conf/access.ini $RutorrentDir/conf/users/$FnUser/access.ini; fi
+
+	echo "[default]" > $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "enabled = user-defined" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeToolbar = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeMenu = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeOptions = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeTabs = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeColumns = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeStatusBar = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canChangeCategory = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+	echo "canBeShutdowned = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+
+	for Plugin in $LISTING; do	
+		if [ -d $RutorrentPluginsDir/$Plugin ]; then
+			if [ -f $RutorrentPluginsDir/$Plugin/conf.php ] || [ -f $RutorrentPluginsDir/$Plugin/config.php ]; then
+				# For each plugin:
+				#	1) Do a global modification
+				#	2) Copy some config file for all users
+				#	3) Enable it for each user
+				case $Plugin in	
+					'linkseedboxmanager')
+						if [ "$IsInstalled_Manager" == "NO" ] && [ "$ToInstall_Manager" == "NO" ]; then
+							DeleteDirectory 0 "$RutorrentDir/conf/users/$FnUser/plugins/$Plugin"
+							DeleteDirectory 0 "$RutorrentPluginsDir/$Plugin"
+						else
+							echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+							echo "enabled = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						fi
+					;;
+					'linkcakebox')
+						if [ "$IsInstalled_Cakebox" == "NO" ] && [ "$ToInstall_Cakebox" == "NO" ]; then
+							if [ -d $RutorrentDir/conf/users/$FnUser/plugins/$Plugin ]; then rm -rf $RutorrentDir/conf/users/$FnUser/plugins/$Plugin; fi
+							if [ -d $RutorrentPluginsDir/$Plugin ]; then rm -rf $RutorrentPluginsDir/$Plugin; fi
+						else
+							echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+							echo "enabled = yes" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						fi
+					;;
+					'fileupload')
+						IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileUpload'\"`"
+						if [ $IsActive -eq 0 ]; then
+							if [ -f $RutorrentDir/share/users/$FnUser/settings/fileuploads.dat ]; then
+								rm -f $RutorrentDir/share/users/$FnUser/settings/fileuploads.dat
+							fi
+						fi
+						unset IsActive
+					;;
+					'fileshare')
+						IsActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' \"name = 'ruTorrent Plugin FileShare'\"`"
+						if [ $IsActive -eq 0 ]; then
+							if [ -f $RutorrentDir/share/users/$FnUser/settings/fileshare.dat ]; then
+								rm -f $RutorrentDir/share/users/$FnUser/settings/fileshare.dat
+							fi
+						fi
+						unset IsActive
+					;;
+					*)
+						# 3) Enable it for each user
+						echo "[$Plugin]" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+						echo "enabled = user-defined" >> $RutorrentDir/conf/users/$FnUser/plugins.ini
+					;;
+				esac
+			fi
+		fi
+	done
+
+	unset LISTING FnHomeDir HomeDirEscaped PortSCGI UserNameUpper
+}
+
+##################### LAST LINE ######################################

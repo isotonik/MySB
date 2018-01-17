@@ -1,0 +1,168 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___        
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_       
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_      
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__     
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_    
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_   
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_  
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__ 
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### VARs
+if [ ! -z "$1" ]; then
+	Switch="$1"
+fi
+
+#### Install packages
+if ! CheckCommand 0 netselect-apt; then
+	PackagesManage install "netselect-apt"
+fi
+
+#### Functions
+CreateBasicSourcesList() {
+	ReposInFile="`cat /etc/apt/sources.list | grep '^deb ' | grep -v 'security' | awk '{ print $2 }'`"
+	Destination="$1"
+
+	if [ -f $Destination ]; then rm $Destination; fi
+	for Repo in $ReposInFile; do
+		echo "deb $Repo $DEBIAN_VERSION main contrib non-free" >> $Destination
+		echo "deb-src $Repo $DEBIAN_VERSION main contrib non-free" >> $Destination
+	done
+
+	echo "# Security" >> $Destination
+	echo "deb http://security.debian.org $DEBIAN_VERSION/updates main contrib non-free" >> $Destination
+	echo "deb-src http://security.debian.org $DEBIAN_VERSION/updates main contrib non-free" >> $Destination
+}
+
+CreateDotDebRepo() {
+	# DotDeb NginX
+	if [ -f /etc/apt/sources.list.d/dotdeb.list ]; then rm -f /etc/apt/sources.list.d/dotdeb.list; fi
+	echo "# NginX" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "# wget http://www.dotdeb.org/dotdeb.gpg" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "# apt-key add dotdeb.gpg" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "deb http://packages.dotdeb.org <debian_version> all" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "deb-src http://packages.dotdeb.org <debian_version> all" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "deb http://dotdeb.thefox.com.fr <debian_version> all" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	echo "deb-src http://dotdeb.thefox.com.fr <debian_version> all" | tee -a /etc/apt/sources.list.d/dotdeb.list
+	sed -i "s/<debian_version>/$DEBIAN_VERSION/g;" /etc/apt/sources.list.d/dotdeb.list
+	wget http://nginx.org/keys/nginx_signing.key
+	apt-key add nginx_signing.key
+	rm -vf nginx_signing.key
+
+	# DotDeb PHP 5.6
+	if [ -f /etc/apt/sources.list.d/dotdeb_php55.list ]; then rm -f /etc/apt/sources.list.d/dotdeb_php55.list; fi
+	echo "# dotdeb php 5.6" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "# wget http://www.dotdeb.org/dotdeb.gpg" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "# apt-key add dotdeb.gpg" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "deb http://packages.dotdeb.org <debian_version>-php55 all" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "deb-src http://packages.dotdeb.org <debian_version>-php55 all" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "deb http://dotdeb.thefox.com.fr <debian_version>-php55 all" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	echo "deb-src http://dotdeb.thefox.com.fr <debian_version>-php55 all" | tee -a /etc/apt/sources.list.d/dotdeb_php55.list
+	sed -i "s/<debian_version>/$DEBIAN_VERSION/g;" /etc/apt/sources.list.d/dotdeb_php55.list
+	wget http://www.dotdeb.org/dotdeb.gpg
+	apt-key add dotdeb.gpg
+	rm -vf dotdeb.gpg
+}
+
+if [ "$Switch" == "BASIC" ]; then
+	CreateBasicSourcesList "/etc/apt/sources.list"
+	CreateDotDebRepo
+else
+	#### Detect mirrors
+	if CheckCommand 0 netselect-apt && wget -q --spider http://google.com; then
+		case `getconf LONG_BIT` in
+			64)
+				Arch="amd64"
+			;;
+			*)
+				Arch="i386"
+			;;
+		esac
+
+		echo "# Generated by 'netselect-apt' for $Arch architecture" > $MySB_InstallDir/temp/sources.list
+		echo "" > $MySB_InstallDir/temp/sources.list
+		netselect-apt -t 50 -n -s stable > $MySB_InstallDir/files/fastest_mirrors
+
+		# Delete bad sources
+		DeleteBadSources "$MySB_InstallDir/files/fastest_mirrors"
+
+		MirrorsList="`cat $MySB_InstallDir/files/fastest_mirrors | grep 'http'`"
+
+		Count=1
+		Max=5
+		for Mirror in $MirrorsList; do
+			if [ $Count -le $Max ]; then
+				Mirror="`echo $Mirror | sed -e 's/^ //g;'`"
+
+				if [ -z "`cat $MySB_InstallDir/temp/sources.list | grep "$Mirror"`" ]; then
+					echo "# $Mirror" >> $MySB_InstallDir/temp/sources.list
+					echo "deb $Mirror $DEBIAN_VERSION main contrib non-free" >> $MySB_InstallDir/temp/sources.list
+					echo "deb-src $Mirror $DEBIAN_VERSION main contrib non-free" >> $MySB_InstallDir/temp/sources.list
+					echo >> $MySB_InstallDir/temp/sources.list
+				fi
+
+				(( Count++ ))
+			fi
+		done
+		echo "# Security" >> $MySB_InstallDir/temp/sources.list
+		echo "deb http://security.debian.org stable/updates main contrib non-free" >> $MySB_InstallDir/temp/sources.list
+		echo "deb-src http://security.debian.org stable/updates main contrib non-free" >> $MySB_InstallDir/temp/sources.list
+		sed -i "s/stable/$DEBIAN_VERSION/g;" $MySB_InstallDir/temp/sources.list
+
+		if [ -f $MySB_InstallDir/temp/sources.list ]; then mv $MySB_InstallDir/temp/sources.list /etc/apt/sources.list; fi
+		rm sources.list*
+
+		#### Validating sources list
+		# PackagesManage 'test'
+		# if [ -f $MySB_InstallDir/temp/netselect-apt ]; then
+			# MirrorsError="`cat $MySB_InstallDir/temp/netselect-apt | grep '^Erreur' | awk '{ print $2 }'`"
+			# for Mirror in $MirrorsError; do
+				# sed -i '/'$Mirror'/d' $MySB_InstallDir/files/fastest_mirrors
+			# done
+			# MirrorsError="`cat $MySB_InstallDir/temp/netselect-apt | grep '^Ignoré' | awk '{ print $2 }'`"
+			# for Mirror in $MirrorsError; do
+				# sed -i '/'$Mirror'/d' $MySB_InstallDir/files/fastest_mirrors
+			# done
+		# fi
+	else
+		CreateBasicSourcesList "/etc/apt/sources.list"
+	fi
+fi
+
+#### Force apt-get update
+if [ "$IsReady_MySB_DB" == "YES" ]; then
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "apt_update = 1, apt_date = 'NOW'" "id_system = 1" '-echo'
+fi
+
+#### Upgrade the system
+ScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_UpgradeSystem" 'SCREEN'
+
+#### Show new /etc/apt/sources.list
+echo
+cat /etc/apt/sources.list
+echo
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

@@ -1,0 +1,139 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$ToInstall_Webmin" == "YES" ]; then
+	if [ ! -f $MySB_InstallDir/files/jcameron-key.asc ]; then
+		wget -t 5 http://www.webmin.com/jcameron-key.asc -O $MySB_InstallDir/files/jcameron-key.asc
+	fi
+	if [ -f $MySB_InstallDir/files/jcameron-key.asc ]; then
+		apt-key add $MySB_InstallDir/files/jcameron-key.asc
+	fi
+
+	#### Add Webmin source
+	echo "# Webmin" > /etc/apt/sources.list.d/webmin.list
+	echo "" >> /etc/apt/sources.list.d/webmin.list
+	echo "# wget -t 5 http://www.webmin.com/jcameron-key.asc" >> /etc/apt/sources.list.d/webmin.list
+	echo "# apt-key add jcameron-key.asc" >> /etc/apt/sources.list.d/webmin.list
+	echo "" >> /etc/apt/sources.list.d/webmin.list
+	echo "deb http://download.webmin.com/download/repository sarge contrib" >> /etc/apt/sources.list.d/webmin.list
+
+	#### Force apt-get update
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "apt_update = 1, apt_date = 'NOW'" "id_system = 1" '-echo'
+
+	#### Install package
+	PackagesManage install "webmin libwrap0 libwrap0-dev"
+
+	#### Create certificate
+	if [ ! -f $MySB_InstallDir/ssl/webmin.cert ]; then
+		ScriptInvoke 'source' "$MySB_InstallDir/install/Certificates" 'CreateServiceCertificate' 'webmin'
+	fi
+
+	cat $MySB_InstallDir/ssl/webmin.cert > /etc/webmin/miniserv.pem
+	cat $MySB_InstallDir/ssl/webmin.key >> /etc/webmin/miniserv.pem
+
+	#### Config
+	perl -pi -e "s/10000/$Ports_Webmin/g" /etc/webmin/miniserv.conf
+	perl -pi -e "s/force_init=0/force_init=1/g" /etc/webmin/firewall/config
+
+	sed -i '/sched_action/d' /etc/webmin/package-updates/config
+	echo "sched_action=1" >> /etc/webmin/package-updates/config
+	sed -i '/sched_email/d' /etc/webmin/package-updates/config
+	echo "sched_email=$MainUserEmail" >> /etc/webmin/package-updates/config
+
+	#### CPAN for TCP wrapper
+	# if [ ! -d /root/.cpan/CPAN/ ]; then
+		# mkdir /root/.cpan/CPAN/
+	# fi
+	# cat root.cpan.CPAN.MyConfig.pm.tmpl | tee -a /root/.cpan/CPAN/MyConfig.pm
+	# perl -X -f -MCPAN -e 'install Authen::Libwrap'
+	
+	# crontab -l > /tmp/crontab.tmp
+	# sed -i '/webmin\/package-updates/d' /tmp/crontab.tmp
+	#echo "0 2 * * 3 /etc/webmin/package-updates/update.pl" >> /tmp/crontab.tmp
+	# crontab /tmp/crontab.tmp
+	# rm -f /tmp/crontab.tmp
+
+	#### Webmin modules
+	PluginOpenVpnActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'OpenVPNadmin WebMin'"`"
+	PluginOpenVpnFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'OpenVPNadmin WebMin'"`"
+	PluginOpenVpnUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'OpenVPNadmin WebMin'"`"
+	PluginOpenVpnOldFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'old_file' 'repositories' "name = 'OpenVPNadmin WebMin'"`"
+	if [ "$PluginOpenVpnActive" == "1" ]; then
+		if [ ! -f $MySB_InstallDir/files/$PluginOpenVpnFile ]; then
+			wget --no-check-certificate -O $MySB_InstallDir/files/$PluginOpenVpnFile $PluginOpenVpnUrl
+		fi
+	fi
+	if [ ! -f $MySB_InstallDir/files/$PluginOpenVpnOldFile ]; then
+		rm -vf $MySB_InstallDir/files/$PluginOpenVpnOldFile
+	fi
+	if [ -f $MySB_InstallDir/files/$PluginOpenVpnFile ]; then
+		perl /usr/share/webmin/install-module.pl $MySB_InstallDir/files/$PluginOpenVpnFile
+	fi
+
+	PluginNginxActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginNginxFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginNginxUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginNginxOldFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'old_file' 'repositories' "name = 'Nginx Webmin Module'"`"
+	if [ "$PluginNginxActive" == "1" ]; then
+		if [ ! -f $MySB_InstallDir/files/$PluginNginxFile ]; then
+			wget --no-check-certificate -O $MySB_InstallDir/files/$PluginNginxFile $PluginNginxUrl
+		fi
+	fi
+	if [ ! -f $MySB_InstallDir/files/$PluginNginxOldFile ]; then
+		rm -vf $MySB_InstallDir/files/$PluginNginxOldFile
+	fi
+	if [ -f $MySB_InstallDir/files/$PluginNginxFile ]; then
+		perl /usr/share/webmin/install-module.pl $MySB_InstallDir/files/$PluginNginxFile
+	fi
+
+	PluginMiniDlnaActive="`Func_SQL_Command 'SELECT' 'MySB_db' 'active' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginMiniDlnaFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginMiniDlnaUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Nginx Webmin Module'"`"
+	PluginMiniDlnaOldFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'old_file' 'repositories' "name = 'Nginx Webmin Module'"`"
+	if [ "$PluginMiniDlnaActive" == "1" ]; then
+		if [ ! -f $MySB_InstallDir/files/$PluginMiniDlnaFile ]; then
+			wget --no-check-certificate -O $MySB_InstallDir/files/$PluginMiniDlnaFile $PluginMiniDlnaUrl
+		fi
+	fi
+	if [ ! -f $MySB_InstallDir/files/$PluginMiniDlnaOldFile ]; then
+		rm -vf $MySB_InstallDir/files/$PluginMiniDlnaOldFile
+	fi
+	if [ -f $MySB_InstallDir/files/$PluginMiniDlnaFile ]; then
+		perl /usr/share/webmin/install-module.pl $MySB_InstallDir/files/$PluginMiniDlnaFile
+	fi
+
+	if CheckCommand 0 webmin; then
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "port_tcp1 = '$Ports_Webmin', to_install = '0', is_installed = '1'" "serv_name = 'Webmin'" '-echo'
+	fi
+
+	#### START services
+	ManageServices start "webmin"
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

@@ -1,0 +1,128 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+log_daemon_msg "Delete current global blocklist"
+if [ ! -d $MySB_InstallDir/files/blocklists ]; then
+	mkdir $MySB_InstallDir/files/blocklists
+else
+	rm -f $MySB_InstallDir/files/blocklists/* &> /dev/null
+fi
+StatusLSB
+
+Func_SQL_Command 'SELECT' 'MySB_db' 'author, list_name, rtorrent_list' 'blocklists' "rtorrent_active = '1' AND rtorrent_list != ''" | while read ROW; do
+	Author="`echo $ROW | awk '{split($0,a,"|"); print a[1]}'`"
+	Author="`echo $Author | sed 's/ /_/g;'`"
+	ListName="`echo $ROW | awk '{split($0,a,"|"); print a[2]}'`"
+	ListName="`echo $ListName | sed 's/ /_/g;'`"
+	URL="`echo $ROW | awk '{split($0,a,"|"); print a[3]}'`"
+	FILE="$Author#$ListName"
+
+	if [ ! -z "$FILE" ] && [ ! -z "$URL" ]; then
+		log_daemon_msg "Download selected list" "$Author - $ListName"
+		CleanBlockList download "$FILE" "$URL" &> /dev/null
+
+		# complete global list
+		if [ -f $MySB_InstallDir/files/blocklists/$FILE.txt ]; then
+			cat $MySB_InstallDir/files/blocklists/$FILE.txt >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+		fi
+
+		# delete unused files
+		if [ -f $MySB_InstallDir/files/blocklists/$FILE.tmp ]; then
+			rm -f $MySB_InstallDir/files/blocklists/$FILE.tmp
+		fi		
+		if [ -f $MySB_InstallDir/files/blocklists/$FILE.gz ]; then
+			rm -f $MySB_InstallDir/files/blocklists/$FILE.gz
+		fi
+		StatusLSB
+	fi	
+done
+
+# Default IP of TMG
+log_daemon_msg "Add know TMG's IP to global blocklist"
+echo "82.138.70.128/26" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "82.138.74.0/25" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "82.138.81.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "85.159.232.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "85.159.236.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "91.189.104.0/20" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.240.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.241.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.242.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.243.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.244.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.107.245.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "193.105.197.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+echo "195.191.244.0/24" >> $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+StatusLSB
+
+# delete blank line
+log_daemon_msg "Delete lines with spaces in global blocklist"
+CleanBlockList del_spaces blocklist_rtorrent
+StatusLSB
+
+# delete all RC
+log_daemon_msg "Delete RC in global list"
+CleanBlockList del_RC blocklist_rtorrent
+StatusLSB
+
+# delete line not start with numeric
+log_daemon_msg "Delete lines not start with numeric in global list"
+CleanBlockList not_numeric blocklist_rtorrent
+StatusLSB
+
+# delete line without "/" (is not in CIDR format)
+log_daemon_msg "Delete lines without IP range in global list"
+CleanBlockList not_iprange blocklist_rtorrent
+StatusLSB
+
+# sort by alpha and delete double line
+log_daemon_msg "Delete double lines & sort global list"
+CleanBlockList sort_uniq blocklist_rtorrent
+StatusLSB
+
+if [ -f $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp ]; then
+	rm -vf $MySB_InstallDir/files/blocklists/blocklist_rtorrent.tmp
+fi
+
+ListingUsers
+for seedUser in $UsersList; do
+	if [ -d /home/$seedUser/ ]; then
+		log_daemon_msg "Copy new global list for $seedUser"
+		if [ -d /home/$seedUser/blocklist ]; then
+			rm -f /home/$seedUser/blocklist/*
+		else
+			mkdir /home/$seedUser/blocklist
+		fi	
+		cp $MySB_InstallDir/files/blocklists/* /home/$seedUser/blocklist/
+		ManageUserHomeDir "$seedUser"
+		StatusLSB
+	fi
+done
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

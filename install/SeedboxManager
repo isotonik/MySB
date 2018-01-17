@@ -1,0 +1,183 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$USAGE" == "ON" ]; then
+	if [ "`screen -ls | grep SeedboxManager`" == "" ]; then
+		if [ "$IsInstalled_Manager" == "NO" ]; then
+			echo
+			echo -e "${CYELLOW}SeedBox-Manager is not installed!$CEND"
+			QuestionGetString NO  "Install Seedbox-Manager? " ToInstall_Manager $ToInstall_Manager
+
+			if [ "$ToInstall_Manager" == "YES" ]; then
+				QuestionGetString NO  "Contact email for Seedbox-Manager: " MainUserEmail $MainUserEmail
+			fi
+
+			Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '$(echo $ToInstall_Manager | sed 's/NO/0/g;' | sed 's/YES/1/g;')'" "serv_name = 'Seedbox-Manager'" '-echo'
+		fi
+	fi
+fi
+
+if [ "$ToInstall_Manager" == "YES" ]; then
+	ManagerUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Seedbox-Manager'"`"
+	ManagerFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Seedbox-Manager'"`"
+
+	cp -vf $MySB_InstallDir/templates/nginx/etc.nginx.locations.seedbox-manager.conf.tmpl /etc/nginx/locations/Seedbox-Manager.conf
+	ManagerDirEscaped="`echo $ManagerDir | sed s,/,\\\\\\\\\\/,g`"
+	perl -pi -e "s/<InstallDir>/$MySB_InstallDirEscaped/g" /etc/nginx/locations/Seedbox-Manager.conf
+	perl -pi -e "s/<manager_rootdir>/$ManagerDirEscaped/g" /etc/nginx/locations/Seedbox-Manager.conf
+	chmod 0644 /etc/nginx/locations/Seedbox-Manager.conf
+
+	## app
+	if [ -d $ManagerDir ]; then
+		cd $ManagerDir/
+		git stash
+		git pull
+	else
+		git clone $ManagerUrl $ManagerDir
+	fi
+
+	if [ -f $ManagerDir/source-reboot-rtorrent/kill_rtorrent.c ]; then
+		(
+		cat <<'EOF'
+#include "kill_rtorrent.h"
+
+void rtorrent_kill (char nickname[])
+{
+    //Déclarations
+    char chaine [100] = {0};
+
+    snprintf(chaine, 100, "service rtorrent-%s stop\n", nickname);
+    printf("%s", chaine);
+    system (chaine);
+}
+EOF
+		) > $ManagerDir/source-reboot-rtorrent/kill_rtorrent.c
+
+		sed -i '/screen_kill/d' $ManagerDir/source-reboot-rtorrent/main.c
+		sed -i '/supprLock/d' $ManagerDir/source-reboot-rtorrent/main.c
+	fi
+
+	if [ -f $ManagerDir/source-reboot-rtorrent/start_rtorrent.c ]; then
+		(
+		cat <<'EOF'
+#include "start_rtorrent.h"
+
+void start_rtorrent (char nickname[])
+{
+    //Déclarations
+    char chaine [100] = {0};
+
+    snprintf(chaine, 100, "service rtorrent-%s start\n", nickname);
+    printf("%s", chaine);
+    system (chaine);
+}
+EOF
+	) > $ManagerDir/source-reboot-rtorrent/start_rtorrent.c
+	fi
+
+	#### Blocs FTP (default)
+	sed -i "s/Les accès ftp - sftp - transdroid/Les accès FTPs - sFTP - Transdroid/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "s/Serveur FTP et sFTP/Serveur FTPs et sFTP/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "/host/s/Adresse (s)FTP :/Adresse :/g" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "s/(s)ftp:\/\/{{ host }}/$HostNameFQDN/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "/userName/s/User (s)FTP :/User :/g" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "/user.portFtp/s/Port FTP :/Port FTPs :/g" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "/user.portSftp/s/Port FTP :/Port sFTP :/g" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "s/Adresse http :/Adresse :/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "s/http:\/\/{{ host }}/$HostNameFQDN/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	sed -i "s/href=\"http:\/\/filezilla.fr\/\"/href=\"http:\/\/filezilla-project.org\/\" target=_blank/g;" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	#### Blocs FTP (spiritofbonobo)
+	sed -i "s/Les accès ftp - sftp - transdroid/Les accès FTPs - sFTP - Transdroid/g;" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "s/Serveur FTP et sFTP/Serveur FTPs et sFTP/g;" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "/host/s/Adresse (s)FTP :/Adresse :/g" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "s/(s)ftp:\/\/{{ host }}/$HostNameFQDN/g;" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "/userName/s/User (s)FTP :/User :/g" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "/user.portFtp/s/Port FTP :/Port FTPs :/g" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "/user.portSftp/s/Port FTP :/Port sFTP :/g" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "s/Adresse http :/Adresse :/g;" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+	sed -i "s/http:\/\/{{ host }}/$HostNameFQDN/g;" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html	
+
+	#### Add new line for the HTTPs port (default)
+	NumLign=$(cat $ManagerDir/public/themes/default/template/bloc-ftp.html | grep 'User transdroid' -n -m 1 | cut -d ':' -f 1)
+	sed -i ""$NumLign"i\<li>Port HTTP<strong>s<\/strong> : <em>$Port_HTTPS<\/em><\/li>\n" $ManagerDir/public/themes/default/template/bloc-ftp.html
+	#### Add new line for the HTTPs port (spiritofbonobo)
+	NumLign=$(cat $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html | grep 'User transdroid' -n -m 1 | cut -d ':' -f 1)
+	sed -i ""$NumLign"i\<li>Port HTTP<strong>s<\/strong> : <em>$Port_HTTPS<\/em><\/li>\n" $ManagerDir/public/themes/spiritofbonobo/template/bloc-ftp.html
+
+	#### Global configs
+	sed -i "s/\$_SERVER\['HTTP_HOST'\]/\$_SERVER\['SERVER_NAME'\]/g;" $ManagerDir/app/downloads.php
+	sed -i "s/'seedbox-'.\$userName;/'MySB - '.\$userName;/g;" $ManagerDir/app/downloads.php
+
+	#### Seedbbox-Manager Bug fix (ob_clean(): failed to delete buffer. No buffer to delete in seedbox-manager/app/Lib/Server.php on line 66)
+	sed -i "s/ob_clean();/\/\/ob_clean();/g;" $ManagerDir/app/Lib/Server.php
+
+	#### Transdroid
+	sed -i "s/443/$Port_HTTPS/g;"  $ManagerDir/app/downloads.php
+	sed -i "/base_ftp_url/s/'ftp:\/\/'.\$userName.'@'.\$_SERVER\['SERVER_NAME'\].'\/torrents\/'/''/g" $ManagerDir/app/downloads.php
+
+	#### Config FileZilla
+	sed -i "s/<Protocol>0<\/Protocol>/<Protocol>4<\/Protocol>/g;" $ManagerDir/app/downloads.php
+	sed -i "s/<Name>'.\$title_seedbox.'-ftp<\/Name>/<Name>MySB - FTPs - '.\$userName.'<\/Name>/g;" $ManagerDir/app/downloads.php
+	sed -i "s/<SyncBrowsing>0<\/SyncBrowsing>'.\$title_seedbox.'-ftp/<SyncBrowsing>0<\/SyncBrowsing>MySB - FTPs - '.\$userName.'/g;" $ManagerDir/app/downloads.php
+	sed -i "s/<Name>'.\$title_seedbox.'-sftp<\/Name>/<Name>MySB - sFTP - '.\$userName.'<\/Name>/g;" $ManagerDir/app/downloads.php
+	sed -i "s/<SyncBrowsing>0<\/SyncBrowsing>'.\$title_seedbox.'-sftp/<SyncBrowsing>0<\/SyncBrowsing>MySB - sFTP - '.\$userName.'/g;" $ManagerDir/app/downloads.php
+
+	#### Install
+	cd $ManagerDir/
+	composer install
+	bower install --allow-root --config.interactive=false
+	chown -R www-data:www-data $ManagerDir/
+	cd ./source-reboot-rtorrent/
+	chmod +x install.sh
+	./install.sh
+
+	# seedbox-manager ruTorrent Plugin
+	PluginManagerDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'ruTorrent Plugin Link Manager'"`"
+	PluginManagerUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'ruTorrent Plugin Link Manager'"`"
+	if [ -d $PluginManagerDir ]; then
+		cd $PluginManagerDir
+		git stash
+		git pull
+	else
+		git clone $PluginManagerUrl $PluginManagerDir
+	fi
+	sed -i "s/http:\/\/seedbox-manager.ndd.tld/https:\/\/$HostNameFQDN:$Port_HTTPS\/sm\//g;" $PluginManagerDir/conf.php
+
+	#### Create directories & change rights
+	ManageDirectoriesAndFiles
+
+	if CheckCommand 0 $ManagerDir/reboot-rtorrent; then
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '0', is_installed = '1'" "serv_name = 'Seedbox-Manager'" '-echo'
+	fi
+
+	#### START services
+	ManageServices start "nginx"
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
