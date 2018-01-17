@@ -1,0 +1,191 @@
+#!/bin/bash
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_before
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+case "$1" in
+	"BEFORE")
+		####################################
+		#### To call for every upgrade - BoF
+		# Get new vars after MySQL.bsh script
+		source $MySB_InstallDir/inc/vars
+
+		# Create missing directories and change rights
+		gfnManageDirAndFiles 'global'
+
+		# Switching DNS
+		gfnSwitchDNS "bind"
+
+		# Forcing NTP update
+		ping -c4 0.fr.pool.ntp.org
+		/usr/sbin/ntpdate -u 0.fr.pool.ntp.org
+
+		# MySQL
+		[ -f /tmp/MySQL.bsh.log ] && cat /tmp/MySQL.bsh.log >> $MySB_InstallDir/logs/BulkChanges.bsh.log
+
+		# VARs & Functions
+		[ -z $funcs_Install ] && source $MySB_InstallDir/inc/funcs_by_script/funcs_Install
+		[ -z $funcs_SourcesList ] && source $MySB_InstallDir/inc/funcs_by_script/funcs_SourcesList
+
+		# Remove old banners
+		rm -fv $MySB_InstallDir/files/banner_*
+
+		# Force install for depends
+		source $MySB_InstallDir/inc/funcs_by_script/funcs_Install
+		gfnPackagesManage install
+		#### To call for every upgrade - EoF
+		####################################
+
+		#### MySQL
+		echo "port = 3306" >> /root/.config.cnf
+		rm -v /etc/mysql/conf.d/*.cnf
+		install -v -o root -g root -m 0600 $MySB_InstallDir/templates/etc.mysql.conf.d.mysb.tmpl /etc/mysql/conf.d/MySB.cnf
+		perl -pi -e "s/^myisam-recover/#myisam-recover/g" /etc/mysql/my.cnf
+		perl -pi -e "s/^log_error/#log_error/g" /etc/mysql/my.cnf		
+
+		#### Backup-Manager
+		[ -f /etc/backup-manager.conf ] && rm -vf /etc/backup-manager.conf
+
+		#### MySQL
+		sed -i '/TMPFS - MySQL/d' /etc/fstab
+		sed -i '/\/mnt\/tmpFS\/mysql/d' /etc/fstab
+		sed -i '/mysql/d' /etc/fstab
+		echo "# TMPFS - MySQL" >> /etc/fstab
+		echo "tmpfs   /mnt/tmpFS/mysql      tmpfs   defaults,nosuid,noatime,mode=1777,size=32M 0 0" >> /etc/fstab
+
+		#### Seedbox-Manager
+		gfnListCountUsers 'normal'
+		for seedUser in $gsUsersList; do
+			[ -f $gsManagerDir/conf/users/$seedUser/config.ini ] && rm -vf $gsManagerDir/conf/users/$seedUser/config.ini
+		done
+
+		#### Sync DB
+		for seedUser in $gsUsersList; do
+			sNewDatabaseUser="/home/$seedUser/db/$seedUser.sq3"
+			sOldDatabaseUser="/home/$seedUser/db/old.sq3"
+			mv -v $sNewDatabaseUser $sOldDatabaseUser
+			cp -v $gsSync_DB $sNewDatabaseUser
+			# ident
+			ModeSync="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT mode_sync FROM ident WHERE ident_id = '1';"`"
+			DstDir="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_dir FROM ident WHERE ident_id = '1';"`"
+			DstSrv="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_srv FROM ident WHERE ident_id = '1';"`"
+			DstPort="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_port FROM ident WHERE ident_id = '1';"`"
+			DstUser="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_user FROM ident WHERE ident_id = '1';"`"
+			DstPass="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_pass FROM ident WHERE ident_id = '1';"`"
+			MaxToSync="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT max_to_sync FROM ident WHERE ident_id = '1';"`"
+			CreateSubDir="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT create_subdir FROM ident WHERE ident_id = '1';"`"
+			MailObjectOK="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT MailObjectOK FROM ident WHERE ident_id = '1';"`"
+			MailObjectKO="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT MailObjectKO FROM ident WHERE ident_id = '1';"`"
+			sqlite3 -cmd '.timeout 150000' $sNewDatabaseUser "UPDATE ident SET mode_sync = '$ModeSync', dst_dir = '$DstDir', dst_srv = '$DstSrv', dst_port = '$DstPort', dst_user = '$DstUser', dst_pass = '$DstPass', max_to_sync = '$MaxToSync', create_subdir = '$CreateSubDir', MailObjectOK = '$MailObjectOK', MailObjectKO = '$MailObjectKO' WHERE ident_id = '1';" -echo
+			# categories
+			Categories="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT name,sync_mode FROM categories WHERE 1;" | sed 's/\t/|/g;'`"
+			for Category in $Categories; do
+				name="`echo $Category | awk '{split($0,a,"|"); print a[1]}'`"
+				sync_mode="`echo $Category | awk '{split($0,a,"|"); print a[2]}'`"
+				sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "INSERT INTO categories (name,sync_mode) VALUES ('$name','$sync_mode');" -echo
+			done
+			# list
+			Lists="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT list_category,is_active,get_base_path,get_custom1,get_name,get_loaded_file,CategoryDir,comments,to_del FROM list WHERE 1;" | sed 's/\t/|/g;'`"
+			for List in $Lists; do
+				list_category="`echo $Category | awk '{split($0,a,"|"); print a[1]}'`"
+				is_active="`echo $Category | awk '{split($0,a,"|"); print a[2]}'`"
+				get_base_path="`echo $Category | awk '{split($0,a,"|"); print a[3]}'`"
+				get_custom1="`echo $Category | awk '{split($0,a,"|"); print a[4]}'`"
+				get_name="`echo $Category | awk '{split($0,a,"|"); print a[5]}'`"
+				get_loaded_file="`echo $Category | awk '{split($0,a,"|"); print a[6]}'`"
+				CategoryDir="`echo $Category | awk '{split($0,a,"|"); print a[7]}'`"
+				comments="`echo $Category | awk '{split($0,a,"|"); print a[8]}'`"
+				to_del="`echo $Category | awk '{split($0,a,"|"); print a[9]}'`"
+				sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "INSERT INTO categories (list_category,is_active,get_base_path,get_directory,get_custom1,get_name,get_loaded_file,comments,to_del) VALUES ('$list_category','$is_active','$get_base_path','$CategoryDir','$get_custom1','$get_name','$get_loaded_file','$comments','$to_del'	);" -echo
+			done
+		done
+	;;
+	"AFTER")
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		gfnManageDirAndFiles 'global'
+
+		# STOP & START services
+		gfnManageServices stop "ntp stunnel4 postfix"
+		gfnManageServices start "ntp stunnel4 postfix smbd nginx dnscrypt-proxy webmin"
+
+		# Update version info
+		cmdMySQL 'MySB_db' "UPDATE system SET mysb_version = '$gsCurrentVersion' WHERE id_system='1';" -v
+		figlet MySB $gsCurrentVersion > /etc/motd
+		echo >> /etc/motd
+
+		# Send mail for each user with new version
+		source $MySB_InstallDir/inc/vars
+		source $MySB_InstallDir/inc/funcs_by_script/funcs_MySB_CreateUser
+		gfnListCountUsers 'normal'
+		gsRutorrentDirEscaped="`echo $gsRutorrentDir | sed s,/,\\\\\\\\\\/,g`"
+		for seedUser in $gsUsersList; do
+			sRequestValues="`cmdMySQL 'MySB_db' "SELECT id_users,users_passwd FROM users WHERE users_ident = '$seedUser';" | sed 's/\t/|/g;'`"
+			UserId="`echo $sRequestValues | awk '{split($0,a,"|"); print a[1]}'`"
+			UserPassword="`echo $sRequestValues | awk '{split($0,a,"|"); print a[2]}'`"
+			# rTorrent init
+			install -v -o root -g root -m 0755 $MySB_InstallDir/templates/init/etc.init.d.rtorrent.tmpl /etc/init.d/rtorrent-$seedUser
+			perl -pi -e "s/<username>/$seedUser/g" /etc/init.d/rtorrent-$seedUser
+			# rTorrent Config File
+			gfnCreateRtorrentConfigFile "$seedUser" 'force'
+
+			if [ "$UserId" == "$gnMainUserId" ] && [ ! -z "$UserPassword" ]; then
+				# Remove main user password from database
+				cmdMySQL 'MySB_db' "UPDATE users SET users_passwd = '' WHERE admin = '1';" -v
+				gfnScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_ChangeUserPassword" "$seedUser" "$UserPassword" 'UPGRADE'
+			else
+				# Init password required
+				cmdMySQL 'MySB_db' "UPDATE users SET init_password = '1' WHERE users_ident = '$seedUser';" -v
+				Subject="$Upgrade_SubjectUpgraded $gsCurrentVersion"
+				gfnSendMail "$Subject" "$seedUser" "upgrade"
+			fi
+		done
+		#### To call for every upgrade - EoF
+		####################################
+
+		# Cleaning
+		if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -vf /etc/init.d/plexmediaserver.dpkg-bak; fi
+		if [ -f /etc/samba/smb.conf.ucf-dist ]; then rm -vf /etc/samba/smb.conf.ucf-dist; fi
+		if [ -f /etc/logrotate.d/fail2ban.dpkg-dist ]; then rm -vf /etc/logrotate.d/fail2ban.dpkg-dist; fi
+		if [ -f /etc/logrotate.d/samba.dpkg-dist ]; then rm -vf /etc/logrotate.d/samba.dpkg-dist; fi
+		if [ -f /etc/vim/vimrc.dpkg-dist ]; then rm -vf /etc/vim/vimrc.dpkg-dist; fi
+		if [ -f /etc/default/stunnel4.dpkg-dist ]; then rm -vf /etc/default/stunnel4.dpkg-dist; fi
+		if [ -f /etc/init.d/nfs-kernel-server.dpkg-dist ]; then rm -vf /etc/init.d/nfs-kernel-server.dpkg-dist; fi
+		if [ -f /etc/init.d/bind9.dpkg-dist ]; then rm -vf /etc/init.d/bind9.dpkg-dist; fi
+		if [ -f /etc/vsftpd.conf.dpkg-dist ]; then rm -vf /etc/vsftpd.conf.dpkg-dist; fi
+		if [ -f /etc/fail2ban/fail2ban.conf.dpkg-dist ]; then rm -vf /etc/fail2ban/fail2ban.conf.dpkg-dist; fi
+
+		#### Apply quota for users
+		gfnManageQuota '-v'
+
+		#### Check actuel quota
+		repquota -a
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
