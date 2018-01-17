@@ -1,0 +1,137 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$USAGE" == "ON" ]; then
+	if [ "$IsInstalled_DNScrypt" == "NO" ]; then
+		echo
+		echo -e "${CYELLOW}DNScrypt-proxy is not installed!$CEND"
+		QuestionGetString NO "Install DNScrypt-proxy? " ToInstall_DNScrypt $Global_YES
+		ToInstall_DNScrypt="`echo $ToInstall_DNScrypt | tr '[:lower:]' '[:upper:]'`"
+
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "is_installed = '$(echo $ToInstall_DNScrypt | sed "s/$Global_NO/0/g;" | sed "s/$Global_YES/1/g;")'" "serv_name = 'DNScrypt-proxy'" '-echo'
+
+		if [ "$ToInstall_DNScrypt" != "YES" ]; then
+			EndingScript 0
+		fi
+	fi
+fi
+
+if [ "$ToInstall_DNScrypt" == "YES" ]; then
+	#### Install packages
+	PackagesManage install "ldnsutils libldns-dev"
+
+	#### Add dnscrypt user
+	if [ "`cat /etc/passwd | grep dnscrypt`" == "" ]; then
+		adduser --system --group --quiet --home /var/run/dnscrypt-proxy --shell /bin/false --disabled-password --disabled-login dnscrypt
+	fi
+
+	# LIBsodium
+	LibsodiumDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'Libsodium'"`"
+	LibsodiumUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Libsodium'"`"
+
+	if [ -d $LibsodiumDir ]; then
+		cd $LibsodiumDir/
+		git stash
+		git pull
+		make clean
+	else
+		git clone $LibsodiumUrl $LibsodiumDir
+	fi
+
+	cd $LibsodiumDir/
+	chmod +x autogen.sh
+	./autogen.sh
+	./configure
+	make -j$PROCESSOR
+	make check
+	make install
+	/sbin/ldconfig
+
+	# DNScrypt
+	DnscryptDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'DNScrypt-proxy'"`"
+	DnscryptUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'DNScrypt-proxy'"`"
+	DnscryptFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'DNScrypt-proxy'"`"
+
+	if [ ! -f $MySB_InstallDir/files/$DnscryptFile ]; then
+		wget --no-check-certificate $DnscryptUrl -O $MySB_InstallDir/files/$DnscryptFile
+	fi
+	if [ ! -d $DnscryptDir ] && [ -f $MySB_InstallDir/files/$DnscryptFile ]; then
+		tar -zxvf $MySB_InstallDir/files/$DnscryptFile -C $MySB_InstallDir/temp/
+		SubDir="`tar -ztf $MySB_InstallDir/files/$DnscryptFile | sed -e 's@/.*@@' | uniq`"
+		if [ -d $MySB_InstallDir/temp/$SubDir ]; then
+			mv $MySB_InstallDir/temp/$SubDir $DnscryptDir
+		fi
+	fi
+
+	cd $DnscryptDir/
+	make clean
+	./autogen.sh
+	./configure
+	make -j$PROCESSOR
+	make check
+	make install
+
+	#### STOP services
+	ManageServices stop "bind9"
+
+	#### DNScrypt-proxy - /etc/init.d/dnscrypt-proxy
+	cp -vf $MySB_InstallDir/templates/init/etc.init.dnscrypt-proxy.tmpl /etc/init.d/dnscrypt-proxy
+	chmod +x /etc/init.d/dnscrypt-proxy
+
+	#### Update resolvers infos in db
+	cp /usr/local/share/dnscrypt-proxy/dnscrypt-resolvers.csv $MySB_InstallDir/files/dnscrypt-resolvers.csv
+	DNScrypt_ResolversRenew
+
+	# Mark as installed
+	if CheckCommand 0 dnscrypt-proxy; then
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '0',is_installed = '1'" "serv_name = 'DNScrypt-proxy'" '-echo'
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "dnscrypt='1'" "id_system='1'" '-echo'
+	fi
+
+	#### Logs
+	if [ ! -d /var/log/dnscrypt-proxy/archives ]; then mkdir -p /var/log/dnscrypt-proxy/archives; fi
+	if [ -f /var/log/dnscrypt-proxy.log ]; then mv /var/log/dnscrypt-proxy.log /var/log/dnscrypt-proxy/; fi
+
+	#### START services
+	ManageServices start "dnscrypt-proxy"
+
+	#### Logrotate
+	LogRotate 'dnscrypt-proxy'
+
+	#### Check if service is OK and running
+	if [ "$Switch" != "UPGRADE" ]; then
+		#Wait a moment for DNScrypt to start
+		sleep 5
+		if ! GetPid dnscrypt-proxy; then
+			service dnscrypt-proxy status | tee -a $MySB_InstallDir/temp/continue
+		fi
+	fi
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

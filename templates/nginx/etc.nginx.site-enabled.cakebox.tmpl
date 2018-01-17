@@ -1,0 +1,31 @@
+server {
+	listen 81;
+	server_name _;
+
+	charset utf-8;
+	allow 127.0.0.1;
+	deny all;
+
+	root <cakebox_rootdir>/public;
+	index index.php;
+
+	access_log off;
+	error_log /var/log/nginx/cakebox-error.log;
+
+	location = / {
+		try_files @site @site;
+	}
+
+	location / {
+		try_files $uri $uri/ @site;
+	}
+
+	location ~ \.php$ {
+		return 404;
+	}
+
+	location @site {
+		include /etc/nginx/conf.d/php-ssl;
+		fastcgi_param  SCRIPT_FILENAME $document_root/index.php;
+	}
+}

@@ -1,0 +1,146 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Install packages
+if ! CheckCommand 0 mysql; then
+	PackagesToInstall="mysql-server"
+fi
+if ! CheckCommand 0 mysqltuner; then
+	PackagesToInstall="$PackagesManage mysqltuner"
+fi
+if [ ! -z "$PackagesToInstall" ]; then
+	PackagesManage install "$PackagesToInstall"
+fi
+
+#### MySQL Secure
+if [ -f /etc/MySB/config_db ]; then source /etc/MySB/config_db; fi
+if [ -z $MySQL_RootPassword ] && [ -z $MySQL_MysbPassword ]; then
+	MySQL_RootPassword="`GenPassword 32`"
+	MySQL_MysbPassword="`GenPassword 16`"
+
+	mysql -u root <<-EOF
+	UPDATE mysql.user SET Password=PASSWORD('$MySQL_RootPassword') WHERE User='root';
+	DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+	DELETE FROM mysql.user WHERE User='';
+	DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%';
+	create database MySB_db;
+	create user MySB_user;
+	grant all on MySB_db.* to 'MySB_user'@'localhost' identified by '$MySQL_MysbPassword';
+	grant all on MySB_db.* to 'MySB_user'@'%' Identified by '$MySQL_MysbPassword';
+	FLUSH PRIVILEGES;
+	EOF
+
+	if [ ! -f /var/lib/mysql/ownCloud_db/db.opt ]; then
+		mysql -u root -p$MySQL_RootPassword <<-EOF
+		create database ownCloud_db;
+		grant all on ownCloud_db.* to 'MySB_user'@'localhost' identified by '$MySQL_MysbPassword';
+		FLUSH PRIVILEGES;
+		EOF
+	fi
+
+	# Add MySQL password into MySB config files
+	echo "MySQL_RootPassword=\"$MySQL_RootPassword\"" >> $MySB_InstallDir/files/MySQL_RootPassword
+	echo "MySQL_MysbPassword=\"$MySQL_MysbPassword\"" >> $MySB_InstallDir/files/MySQL_MysbPassword
+	echo "MySQL_RootPassword=\"$MySQL_RootPassword\"" >> /etc/MySB/config_db
+	echo "MySQL_MysbPassword=\"$MySQL_MysbPassword\"" >> /etc/MySB/config_db
+	if [ ! -f /etc/MySB/config.php ]; then
+		cp -f $MySB_InstallDir/templates/mysb/etc.mysb.config.php.tmpl /etc/MySB/config.php
+		perl -pi -e "s/<MySB_InstallDir>/$MySB_InstallDirEscaped/g" /etc/MySB/config.php
+		if [ ! -z "$MySQL_MysbPassword" ]; then
+			perl -pi -e "s/<MySQL_MysbPassword>/$MySQL_MysbPassword/g" /etc/MySB/config.php
+		fi
+	fi
+
+	# Create MySQL client config file for MySB_user
+	echo "[client]" > /root/.config.cnf
+	echo "user = MySB_user" >> /root/.config.cnf
+	echo "password = $MySQL_MysbPassword" >> /root/.config.cnf
+	echo "host = localhost" >> /root/.config.cnf
+	chmod 0600 /root/.config.cnf
+
+	# Create MySB database (ONLY during a new install, NOT during an upgrade)
+	if [ "$1" == "INSTALL" ]; then
+		mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Schema_2016-01-12.sql
+		mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Data_2016-01-12.sql
+	fi
+else
+	if [ -f $MySB_InstallDir/files/MySQL_RootPassword ]; then rm -vf $MySB_InstallDir/files/MySQL_RootPassword; fi
+	if [ -f $MySB_InstallDir/files/MySQL_MysbPassword ]; then rm -vf $MySB_InstallDir/files/MySQL_MysbPassword; fi
+fi
+
+#### Temp directory in memory
+if [ ! -d /media/MySQL_TempDir ]; then
+	mkdir -pv /media/MySQL_TempDir
+	chmod 777 /media/MySQL_TempDir
+	mount -t tmpfs -o size=64M tmpfs /media/MySQL_TempDir
+	echo "# MySQL Temp Directory" >> /etc/fstab
+	echo "tmpfs   /media/MySQL_TempDir      tmpfs   defaults,size=64M 0 0" >> /etc/fstab
+fi
+
+#### Config file
+# Logging
+perl -pi -e "s/^#general_log_file/general_log_file/g" /etc/mysql/my.cnf
+# Caching
+NumLign=$(cat /etc/mysql/my.cnf | grep 'query_cache_limit' -n -m 1 | cut -d ':' -f 1)
+sed -i '/query_cache_limit/d' /etc/mysql/my.cnf
+sed -i "${NumLign}i\query_cache_limit       = 2M" /etc/mysql/my.cnf
+NumLign=$(cat /etc/mysql/my.cnf | grep 'query_cache_size' -n -m 1 | cut -d ':' -f 1)
+sed -i '/query_cache_size/d' /etc/mysql/my.cnf
+sed -i "${NumLign}i\query_cache_size       = 64M" /etc/mysql/my.cnf
+(( NumLign++ ))
+sed -i "${NumLign}i\query_cache_type        = 1" /etc/mysql/my.cnf
+# Optimizing
+if [ -d /media/MySQL_TempDir ]; then
+	NumLign=$(cat /etc/mysql/my.cnf | grep 'tmpdir' -n -m 1 | cut -d ':' -f 1)
+	sed -i '/tmpdir/d' /etc/mysql/my.cnf
+	sed -i "${NumLign}i\tmpdir          = /media/MySQL_TempDir" /etc/mysql/my.cnf
+fi
+
+#### STOP services
+ManageServices 'stop' 'mysql'
+
+# Force mysql user homedir (Pas de répertoire, connexion avec HOME=/)
+if [ -z "`getent passwd mysql | grep '/var/lib/mysql'`" ]; then
+	usermod -d /var/lib/mysql mysql
+fi
+
+#### START services
+ManageServices 'start' 'mysql'
+
+#### Logrotate
+LogRotate 'mysql-server'
+
+#### MySQL Tuner
+mysqltuner --user root --pass $MySQL_RootPassword --nocolor > $MySB_InstallDir/temp/mysqltuner.log
+cat $MySB_InstallDir/temp/mysqltuner.log
+if [ ! -z "`cat $MySB_InstallDir/temp/mysqltuner.log | grep 'Run OPTIMIZE TABLE'`" ]; then
+	mysqlcheck -u root -p$MySQL_RootPassword --auto-repair --optimize --all-databases
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

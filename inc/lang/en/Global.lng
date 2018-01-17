@@ -1,0 +1,105 @@
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+Header_Install_0="${CRED}############################################################$CEND
+${CRED}#$CEND ${CYELLOW}At the end of the installation, you will receive an email.$CEND
+${CRED}#$CEND ${CYELLOW}It lists information about your account.$CEND
+${CRED}# IMPORTANT:$CEND ${CYELLOW}Remember to also to check the SPAM folder of your mail account...$CEND
+${CRED}############################################################$CEND"
+Header_CurrentFile="Current file:"
+
+Global_NO="NO"
+Global_YES="YES"
+Global_ALL="all"
+Global_Again="Again:"
+Global_Done="${CGREEN}Done !$CEND"
+Global_Failed="${CRED}Failed !$CEND"
+Global_NothingToDo="${CGREEN}Nothing to do !$CEND"
+Global_PleaseWait="Please wait"
+Global_SeeYouLater="${CYELLOW}OK, see you later...$CEND"
+Global_WantToContinue="Do you want to continue, type '$Global_YES' else type '$Global_NO' ? "
+Global_OwnerAndRights="Changing owners and rights for files and directories"
+Global_FinalSecurityRules="Creating final security rules"
+Global_ServerWillRestart="The server will restart in "
+Global_UpdatingVersion="Updating the MySB version"
+
+Global_Subject_PaymentReminder="MySB - Payment Reminder for"
+Global_Subject_MonthlyPayment="MySB - Changing monthly payments"
+Global_Subject_PeerGuardianCheck="MySB - PeerGuardian is not started !"
+Global_Subject_rTorrentNotify="MySB - Available files !"
+
+Global_Error_StatusSTD="${CRED}Looks like something is wrong, check the log '$MySB_InstallDir/logs/$ScriptName.*', aborting.$CEND"
+
+Funcs_SendMail_GenerateHTML="Generating the HTML file for"
+Funcs_SendMail_SendingEmail="Send an email to"
+
+Funcs_PackagesManage_Aptitude_0="Error"
+Funcs_PackagesManage_Aptitude_1="Ignored"
+Funcs_PackagesManage_AptGet_0="Err"
+Funcs_PackagesManage_AptGet_1="Ign"
+
+Funcs_PeerGuardianFailed_Switching="Switching use of blocklists with"
+
+Global_Readme_AvailableVariables="Available variables:
+\"\$get_base_path\"		--> Initial download location.
+\"\$get_custom1\"		--> New tree download.
+\"\$get_name\"			--> Download name.
+
+To send mail from your script, you can use the following command:
+	subject=\"MySB - NAS transfer finished !\"
+	curl --data \"username=$UserName&get_base_path=$get_base_path&get_custom1=$get_custom1&get_name=$get_name&subject=$subject\" http://localhost:8888/rTorrent.php
+
+Scripts ending with the extension '.sh' will be performed at the end of a download.
+Scripts ending with the extension '.cron' will be performed by Planning (Portal> MySB Options).
+
+######################################################################
+
+For example, to schedule a synchronization with rsync, you can use two scripts.
+	1/	\"rsync.sh.example\"		--> Rename this file to \"rsync.sh\".
+		Each of your downloads will be synced to the destination of your choice.
+		NB: Remember to fill in the information of the destination in the script.
+
+	2/	If the \"list.sh\" script exists, then delete it.
+
+OR
+
+	1/	\"list.sh.example\"		--> Rename this file to \"list.sh\".
+		Each of your downloads will be added to a list using this script.
+
+	2/	\"rsync.cron.example\"	-->	Rename this file to \"rsync.cron\".
+		NB: Remember to fill in the information of the destination in the script.
+
+	3/	If the \"rsync.sh\" script exists, then delete it.
+
+	4/	Add a CRON job through \"Portal> Options MySB\".
+		For planning to 20:00 every day of the week:
+			Minutes:		0
+			Hours:			20
+			Month days:		*
+			Months:			*
+			Week days:		*
+			Script:			rsync.cron
+
+		The script \"rsync.cron\" will synchronize all files listed in the list created by \"list.sh\"."
+
+##################### LAST LINE ######################################
