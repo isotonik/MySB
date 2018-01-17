@@ -1,0 +1,98 @@
+#!/bin/bash 
+# ----------------------------------
+source /etc/MySB/inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___        
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_       
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_      
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__     
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_    
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_   
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_  
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__ 
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+#
+# Usage:	MySB_UpgradeMe
+#
+##################### FIRST LINE #####################################
+
+#### Update actual repo
+ScriptInvoke 'source' '/etc/MySB/bin/MySB_UpdateGitHubRepo'
+
+#### Check if new version
+MySB_NewVersion="`cat /etc/MySB/version`"
+MySB_CurrentVersion=`cat /etc/MySB/infos/version.info`
+
+if [ "$MySB_CurrentVersion" == "$MySB_NewVersion" ]; then
+	echo
+	echo -e "${CGREEN}MySB is up to date !$CEND"
+	echo
+	if [ "`cat /etc/MySB/inc/funcs | grep 'EndingScript()'`" == "" ]; then
+		source /etc/MySB/inc/includes_after
+		exit 0
+	else
+		EndingScript 0
+	fi	
+else
+	echo
+	echo -e "${CYELLOW}MySB$CEND ${CGREEN}$MySB_NewVersion$CEND ${CYELLOW}is avaible !$CEND"
+	echo -e "${CYELLOW}Do you want to continue and upgrade MySB to $CEND${CGREEN}$MySB_NewVersion$CEND ${CYELLOW}?$CEND"
+	echo
+	GetString NO  "Type 'yes' to continue or 'no' to abort ?" CONTINUE NO
+	if [ "$CONTINUE" == "NO" ]; then
+		if [ "`cat /etc/MySB/inc/funcs | grep 'EndingScript()'`" == "" ]; then
+			source /etc/MySB/inc/includes_after
+			exit 0
+		else
+			EndingScript 0
+		fi	
+	fi
+fi
+
+#### Backup
+DateTime="`/bin/date +%Y%m%d-%H%M%S`"
+if [ ! -d /etc/MySB/upgrade/backup ]; then
+	mkdir -p /etc/MySB/upgrade/backup
+fi
+mv /etc/MySB/upgrade/backup /tmp/MySB_backup_$DateTime
+tar -zcvf /tmp/MySB_backup_$DateTime/Backup-$DateTime-$MySB_CurrentVersion.tar.gz /etc/MySB
+mv /tmp/MySB_backup_* /etc/MySB/upgrade/backup
+
+#### MySB Script GitHub
+cd /etc/MySB/
+sudo git fetch --all
+sudo git stash
+sudo git checkout -b $MySB_NewVersion origin/$MySB_NewVersion
+sudo git pull
+
+#### Update version info
+echo "$MySB_NewVersion" > /etc/MySB/infos/version.info
+rm /etc/MySB/files/banner_*
+
+#### Completing the upgrade
+if [ -f /etc/MySB/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh ]; then
+	echo
+	echo
+	echo -e "${CBLUE}Starting SCREEN session...$CEND"
+	screen -wipe
+	screen -dmS MySB_UpgradeMe /bin/bash /etc/MySB/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh;
+	sleep 10
+	screen -r MySB_UpgradeMe
+fi
+
+# -----------------------------------------
+source /etc/MySB/inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
