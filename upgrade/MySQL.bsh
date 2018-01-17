@@ -1,0 +1,17 @@
+#### 1 - ALTER some tables - BoF
+
+#### 1 - ALTER some tables - EoF
+
+#### 2 - Import Schema for new tables, triggers & constraints - BoF
+mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Schema.sql
+mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $MySB_InstallDir/templates/Dump_MySQL_MySB_db_Triggers.sql
+#### 2 - Import Schema for new tables, triggers & constraints - EoF
+
+#### 3 - UPDATE some tables - BoF
+# repositories
+cmdMySQL 'MySB_db' "DELETE FROM repositories;" -v
+mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $MySB_InstallDir/upgrade/repositories.sql
+# lets_encrypt
+cmdMySQL 'MySB_db' "DELETE FROM lets_encrypt;" -v
+mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $MySB_InstallDir/upgrade/lets_encrypt.sql
+#### 3 - UPDATE some tables - EoF
