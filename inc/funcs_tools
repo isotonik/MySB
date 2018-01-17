@@ -1,0 +1,339 @@
+#!/bin/bash
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Count down
+CountDown() {
+	for ((i = $1; i >= 0; i -= 1)); do
+		echo -n " $i"
+		sleep 1
+	done
+	echo
+}
+
+#### Create user listing
+ListingUsers() {
+	if [ -d $MySB_InstallDir/users/ ] && [ "`ls $MySB_InstallDir/users/ | grep '.info' | sed 's/.\{5\}$//'`" != "" ]; then
+		UsersList=`ls $MySB_InstallDir/users/ | grep '.info' | sed 's/.\{5\}$//'`
+	else
+		UsersList="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT users_ident FROM users WHERE 1\"`"	
+	fi
+}
+
+#### Count Users
+CountingUsers() {
+	TotalUsers="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT count(*) FROM users\"`"
+}
+
+#### Check if a package is installed
+CheckPackage() {
+	Result="`dpkg --status $1 2> /dev/null | grep 'Status' | cut -d ':' -f 2 | sed -e 's/^ //g;'`"
+	
+	if [ "$Result" == "install ok installed" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+#### Check if service is started
+GetPid() {
+	PID=""
+
+	case "$1" in
+		"fail2ban")
+			if [ -f /var/run/fail2ban/fail2ban.pid ]; then
+				PID="`cat /var/run/fail2ban/fail2ban.pid`"
+			fi
+		;;
+		"webmin")
+			if [ -f /var/webmin/miniserv.pid ]; then
+				PID="`cat /var/webmin/miniserv.pid`"
+			fi
+		;;
+		"ssh")
+			PID="`pidof sshd`"
+		;;
+		"pglcmd")
+			PID="`pidof pgld`"
+		;;
+		"bind9")
+			PID="`pidof named`"
+		;;
+		*)
+			PID="`pidof $1`"
+		;;
+	esac
+	
+	if [ ! -z "$PID" ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+#### Check status for screen
+StatusSTD() {
+	if [ $? -gt 0 ]; then
+		echo -e "${CRED}Failed !$CEND"
+		echo ""
+		echo -e "${CRED}Looks like somethig is wrong, check log in '$MySB_InstallDir/logs/$ScriptName.*', aborting.$CEND"
+		EndingScript 1
+	else
+		echo -e "${CGREEN}Done !$CEND"
+	fi
+}
+
+#### Check status for LSB
+StatusLSB() {
+	if [ $? -gt 0 ]; then
+		if [ ! -z "$1" ]; then
+			if [ $1 -gt 0 ]; then
+				log_end_msg 1
+			else
+				log_end_msg 0
+			fi
+		else
+			log_end_msg 1
+		fi
+	else
+		log_end_msg 0
+	fi
+}
+
+#### Waiting in install
+WaitingScreen() {	
+	if [ -f $MySB_InstallDir/logs/$1.err ]; then
+		err=`du $MySB_InstallDir/logs/$1.err | cut -f1`
+	fi
+
+	while [ ! "`screen -ls | grep $1`" = "" ]; do
+		if [ -f $MySB_InstallDir/logs/$1.err ]; then
+			if [ ! "`du $MySB_InstallDir/logs/$1.err | cut -f1`" = "$err" ]; then
+				err=`du $MySB_InstallDir/logs/$1.err | cut -f1`
+				echo -e -n "${CRED}.$CEND"
+			else
+				echo -n "."
+			fi
+		else
+			echo -n "."
+		fi
+		sleep 1
+	done
+}
+
+#### Waiting standard
+WaitingSTD() {
+	while [ ! "`screen -ls | grep $1`" = "" ]; do	
+		sleep 1
+	done
+}
+
+#### Password generator
+GenPassword() {
+	local l=$1
+	[ "$l" == "" ] && l=16
+	tr -dc A-Za-z0-9_ < /dev/urandom | head -c ${l} | xargs
+}
+
+#### Check if is a correct IP
+ValidateIP() {
+	Value=""
+	
+	if [ ! -z "$1" ]; then
+		Value=`printf $1 | awk -F'.' 'NF==4 && $1>0 && $1!=127 && $1<256 && $2<256 && $3<256 && $4<256 && !/\.\./'`
+	fi
+	
+	echo $Value
+}
+
+#### Check if mail syntax is good
+ValidateMail() {
+	#Regexp
+	regex="^[a-z0-9!#\$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?\$"
+
+	#Vars
+	checkdig=0;
+	checkreg=0;
+	address=$1;
+	maildomain=`echo $address | awk 'BEGIN { FS = "@" } ; { print $2 }'`;
+
+	#Domain Check
+	checkdns() {
+		echo $maildomain | awk 'BEGIN { FS = "@" } ; { print $2 }' | xargs dig $maildomain | grep "ANSWER: 0" 1>/dev/null  || checkdig=1;
+	}
+
+	#Regexp
+	checkreg() {
+		if [[ $address =~ $regex ]]; then
+			checkreg=1;
+		fi
+	}
+
+	#Execute
+	checkreg;
+	checkdns;
+
+	#Results
+	if [ $checkreg == 1 ] && [ $checkdig == 1 ]; then
+		echo 1
+	else
+		echo 0
+	fi
+}
+
+#### Ending script
+EndingScript() {
+	if [ -f $(dirname $0)/../inc/includes_after ]; then source $(dirname $0)/../inc/includes_after; fi
+	if [ ! -z $2 ]; then
+		kill -9 $2
+	else
+		exit $1
+	fi
+}
+
+#### Check if a command exist
+CheckCommand() {
+	type -P $2 > /dev/null
+	Value=$?
+	
+	if [ $Value -gt 0 ]; then # Try WHEREIS, some tools does not have command but are present and can be started
+		if [ "`whereis $2 | awk '{ print $2 }'`" == "" ]; then
+			case "$1" in
+				0)
+					return 1
+				;;
+				1)
+					echo "NO"
+				;;
+			esac
+		else
+			case "$1" in
+				0)
+					return 0
+				;;
+				1)
+					echo "YES"
+				;;
+			esac
+		fi
+	else
+		case "$1" in
+			0)
+				return $Value
+			;;
+			1)
+				case "$Value" in
+					0)
+						echo "YES"
+					;;
+					*)
+						echo "NO"
+					;;
+				esac
+			;;
+		esac
+	fi
+}
+
+#### Switch DNS (standard / DNScrypt-proxy)
+SwitchDNS() {
+	case "$1" in
+		"dnscrypt")
+			if CheckCommand 0 dnscrypt-proxy; then
+				# resolv.conf
+				sed -i '/nameserver/d' /etc/resolv.conf
+				echo "nameserver 127.0.0.1" > /etc/resolv.conf
+				# BIND with DNScrypt-proxy support (Bind will be restart by DNScrypt-proxy)
+				cp $MySB_InstallDir/templates/etc.bind.named.conf.options.template /etc/bind/named.conf.options
+				sed -i "s/<SrvIpAddress>/$SrvIpAddress/g;" /etc/bind/named.conf.options
+				chmod 0644 /etc/bind/named.conf.options
+				chown root:bind /etc/bind/named.conf.options
+				# DNScrypt-proxy
+				cp $MySB_InstallDir/templates/etc.init.dnscrypt-proxy.template /etc/init.d/dnscrypt-proxy
+				perl -pi -e "s/<MySB_DB>/`echo $MySB_DB | sed s,/,\\\\\\\\\\/,g`/g" /etc/init.d/dnscrypt-proxy
+				perl -pi -e "s/<InstallDir>/$MySB_InstallDirEscaped/g" /etc/init.d/dnscrypt-proxy
+				chmod +x /etc/init.d/dnscrypt-proxy
+				service dnscrypt-proxy restart &> /dev/null
+			fi
+		;;
+		"standard")
+			# resolv.conf
+			sed -i '/nameserver/d' /etc/resolv.conf
+			echo "nameserver 208.67.220.220" >> /etc/resolv.conf
+			echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.1" >> /etc/resolv.conf
+			echo "nameserver 208.67.222.222" >> /etc/resolv.conf
+			echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.2" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.3" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.4" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.5" >> /etc/resolv.conf
+			echo "nameserver 4.2.2.6" >> /etc/resolv.conf
+			# BIND delete DNScrypt-proxy support
+			sed -i '/forwarders/d' /etc/bind/named.conf.options
+			sed -i '/forward only;/d' /etc/bind/named.conf.options
+			sed -i '/version/d' /etc/bind/named.conf.options
+			sed -i '/DNScrypt-proxy/d' /etc/bind/named.conf.options
+			service bind9 restart &> /dev/null
+		;;
+	esac
+}
+
+#### Upgrade in progress (web page)
+UpgradeInProgress() {
+	case "$1" in
+		"on")
+			if [ -h /etc/nginx/sites-enabled/WiP ]; then rm -f /etc/nginx/sites-enabled/WiP; fi
+			if [ -h /etc/nginx/sites-enabled/default ]; then rm -f /etc/nginx/sites-enabled/default; fi
+			if [ -h /etc/nginx/sites-enabled/cakebox ]; then rm -f /etc/nginx/sites-enabled/cakebox; fi
+			cp $MySB_InstallDir/templates/etc.nginx.site-enabled.WiP.template /etc/nginx/sites-available/WiP
+			if [ ! -h /etc/nginx/sites-enabled/WiP ]; then ln -s /etc/nginx/sites-available/WiP /etc/nginx/sites-enabled/WiP; fi
+			service nginx restart &> /dev/null
+		;;
+		"off")
+			if [ -h /etc/nginx/sites-enabled/WiP ]; then rm -f /etc/nginx/sites-enabled/WiP; fi
+			if [ ! -h /etc/nginx/sites-enabled/default ]; then ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default; fi
+			if [ ! -h /etc/nginx/sites-enabled/cakebox ]; then ln -s /etc/nginx/sites-available/cakebox /etc/nginx/sites-enabled/cakebox; fi
+			service nginx restart &> /dev/null
+		;;
+	esac
+}
+
+#### Banner Upgrade
+BannerUpgrade() {
+	echo
+	echo -e "${CRED}If you lose connection during installation, restart the SSH session and run the following command:$CEND"
+	echo -e "${CGREEN}	screen -r MySB_Upgrade$CEND"
+	echo
+	echo -e "${CYELLOW}All users password will be changed by temporary password (except main user).$CEND"
+	echo -e "${CYELLOW}All users IP addresses will be removed (except main user).$CEND"
+	echo -e "${CYELLOW}They will receive an email with information to change it.$CEND"
+	echo -e "${CYELLOW}Their IP address will be automatically added into the database.$CEND"
+	echo
+	echo -e "${CYELLOW}The upgrade may take 30 to 60 minutes around.$CEND"
+	echo -e "${CYELLOW}This will depend on your server configuration and installed services.$CEND"
+	echo
+}
+
+##################### LAST LINE ######################################

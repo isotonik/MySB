@@ -1,0 +1,548 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+#
+# Usage:	MySB_SecurityRules {clean|create|refresh}
+#
+##################### FIRST LINE #####################################
+
+source $MySB_InstallDir/inc/funcs_iptables
+
+#### VARs
+Switch="$1"
+ListingUsers #($UsersList)
+AllUsersIPs="${SeedboxUsersIPs} ${MainUserIPs}"
+AllUsersIPs=$(echo "$AllUsersIPs"|tr " " "\n"|sort|uniq|tr "\n" " ") # sort as uniq
+
+ServicesToRestart=""
+#### VARs
+
+#### Check arguments options
+LoadModules=NO
+LoadKernelParameter=NO
+ApplyConfigNginx=NO
+ApplyConfigPeerGuardian=NO
+ApplyConfigFail2Ban=NO
+ApplyConfigBind=NO
+ApplyConfigDnscrypt=NO
+ApplyIptablesUsers=NO
+ApplyIptablesDnscrypt=NO
+
+# Check by arguments
+for Arg in "$@"; do
+	case "$Arg" in
+		INSTALL|UPGRADE|INIT)
+			LoadKernelModules=YES
+			LoadKernelParameter=YES
+		;;
+	esac
+done
+
+case "$Switch" in
+	create)
+		ApplyConfigNginx="`CheckCommand 1 nginx`"
+		ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+		ApplyConfigFail2Ban=$IsInstalled_Fail2Ban
+		ApplyConfigBind="`CheckCommand 1 named`"
+		ApplyConfigDnscrypt=$IsInstalled_DNScrypt
+	;;
+	clean)
+		ApplyConfigNginx="`CheckCommand 1 nginx`"
+		ApplyConfigBind="`CheckCommand 1 named`"
+	;;
+	refresh)
+		for Arg in "$@"; do
+			case "$Arg" in
+				--users)
+					ApplyIptablesUsers=YES
+					ApplyConfigNginx="`CheckCommand 1 nginx`"
+					ApplyConfigFail2Ban=$IsInstalled_Fail2Ban
+					ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+				;;
+				--dnscrypt)
+					ApplyIptablesDnscrypt=$IsInstalled_DNScrypt
+					ApplyConfigBind="`CheckCommand 1 named`"
+					ApplyConfigDnscrypt=$IsInstalled_DNScrypt
+					ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+				;;
+				--trackers)
+					ApplyConfigBind="`CheckCommand 1 named`"
+					ApplyConfigDnscrypt=$IsInstalled_DNScrypt
+					ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+				;;
+				--blocklists)
+					ApplyConfigBind="`CheckCommand 1 named`"
+					ApplyConfigDnscrypt=$IsInstalled_DNScrypt
+					ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+				;;
+				--all)
+					ApplyIptablesUsers=YES
+					ApplyConfigNginx="`CheckCommand 1 nginx`"
+					ApplyConfigBind="`CheckCommand 1 named`"
+					ApplyConfigDnscrypt=$IsInstalled_DNScrypt
+					ApplyConfigFail2Ban=$IsInstalled_Fail2Ban
+					ApplyConfigPeerGuardian=$IsInstalled_PeerGuardian
+				;;
+			esac
+		done
+	;;
+esac
+
+if [ "$ApplyConfigBind" == "YES" ]; then
+	AllTrackersDomain="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT tracker_domain FROM trackers_list WHERE is_active = '0' AND to_check = '0'\"`"
+	ServicesToRestart="${ServicesToRestart} bind9"
+fi
+if [ "$ApplyConfigDnscrypt" == "YES" ]; then
+	ServicesToRestart="${ServicesToRestart} dnscrypt-proxy"
+fi
+if [ "$ApplyConfigFail2Ban" == "YES" ]; then
+	ServicesToRestart="${ServicesToRestart} fail2ban"
+fi
+if [ "$ApplyConfigPeerGuardian" == "YES" ]; then
+	ServicesToRestart="${ServicesToRestart} pglcmd"
+fi
+if [ "$ApplyConfigNginx" == "YES" ]; then
+	ServicesToRestart="${ServicesToRestart} nginx"
+fi
+#### Check arguments options
+
+#### Functions
+# Create all rules for services (config files)
+CreateServicesRules() {
+	#### NginX
+	if [ "$ApplyConfigNginx" == "YES" ] && [ "$IpRestriction" == "YES" ]; then
+		log_daemon_msg "NginX - Allowing IP addresses of all users"
+		echo "	# Users allowed IP" > /etc/nginx/conf.d/ip_restriction
+		for IPv4 in $AllUsersIPs; do
+			echo "	allow $IPv4;" >> /etc/nginx/conf.d/ip_restriction
+		done
+		unset IPv4
+		StatusLSB
+	fi
+	#### NginX
+
+	#### NginX
+	if [ "$ApplyConfigNginx" == "YES" ]; then
+		if [ "$IpRestriction" == "YES" ]; then
+			if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+				# OpenVPN local IP addresses
+				log_daemon_msg "NginX - Allowing IP addresses of OpenVPN users"
+				echo "	# Restricted IP for OpenVPN users" >> /etc/nginx/conf.d/ip_restriction
+				for IPv4 in $VpnIPs; do
+					echo "	allow $IPv4;" >> /etc/nginx/conf.d/ip_restriction
+				done
+				unset IPv4
+				StatusLSB
+			fi
+
+			# Loopback
+			log_daemon_msg "NginX - Allowing the loopback interface"
+			echo "	# Localhost" >> /etc/nginx/conf.d/ip_restriction
+			echo "	allow 127.0.0.1;" >> /etc/nginx/conf.d/ip_restriction
+			StatusLSB
+
+			# Deny all others
+			echo "	# Deny all others" >> /etc/nginx/conf.d/ip_restriction
+			echo "	deny all;" >> /etc/nginx/conf.d/ip_restriction
+		else
+			log_daemon_msg "NginX - Satisfy all"
+			echo "	# Allow any one" >> /etc/nginx/conf.d/ip_restriction
+			echo "	satisfy all;" > /etc/nginx/conf.d/ip_restriction
+			StatusLSB		
+		fi
+	fi
+	#### NginX
+
+	#### BIND
+	if [ "$ApplyConfigBind" == "YES" ]; then
+		log_daemon_msg "Bind - Block all outgoing request for inactive trackers"
+		AllTrackersDomain="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT tracker_domain FROM trackers_list WHERE is_active = '0' AND to_check = '0'\"`"
+		echo "#### MySB - Blacklisted domains (ex: inactive trackers)" > /etc/bind/MySB.zones.blakclists
+		for TrackerDomain in $AllTrackersDomain; do
+			echo "zone \"$TrackerDomain\" { type master; file \"/etc/bind/db.empty\"; };" >> /etc/bind/MySB.zones.blakclists
+		done
+		perl -pi -e "s/^#include \"\/etc\/bind\/MySB.zones.blakclists\";/include \"\/etc\/bind\/MySB.zones.blakclists\";/g" /etc/bind/named.conf.local
+		StatusLSB 0
+	fi
+	#### BIND
+
+	#### Fail2Ban
+	if [ "$ApplyConfigFail2Ban" == "YES" ]; then
+		Fail2BanWhitheList 1
+	fi
+	#### Fail2Ban
+
+	#### PeerGuardian
+	if [ "$ApplyConfigPeerGuardian" == "YES" ]; then
+		# Create '/etc/pgl/pglcmd.conf'
+		PeerGuardianPglcmdConf 0
+		# Create '/etc/pgl/allow.p2p'
+		PeerGuardianAllowP2P 0
+		# Create '/etc/pgl/blocklists.list'
+		PeerGuardianBlocklistsList 0 "CreateFile"
+		# Create '/etc/pgl/*.insert.sh'
+		PeerGuardianIptablesInsert 0
+	fi
+	#### PeerGuardian
+}
+
+# Restart all rTorrent session if needed
+RestartRtorrentSessions() {
+	case "$1" in
+		stop)
+			for FnUser in $UsersList; do
+				service rtorrent-$FnUser stop
+			done
+		;;
+		start)
+			service cron status > /dev/null
+			if [ $? -eq 0 ]; then
+				for FnUser in $UsersList; do
+					service rtorrent-$FnUser status &> /dev/null
+					if [ $? -ne 0 ]; then
+						service rtorrent-$FnUser restart
+					fi
+				done
+			fi
+		;;
+	esac
+}
+#### Functions
+
+
+#### Begin
+case "$Switch" in
+	clean)
+		#### STOP services
+		RestartRtorrentSessions "stop"
+		ManageServices stop "pglcmd fail2ban cron"
+		#### STOP services
+
+		#### IPtables - Removal of existing rules
+		log_daemon_msg "IPtables - Removal of existing rules"
+		FlushingTables
+		StatusLSB
+		#### IPtables - Removal of existing rules
+
+		#### NginX - Satisfy all
+		if [ "$ApplyConfigNginx" == "YES" ]; then
+			log_daemon_msg "NginX - Satisfy all"
+			echo "	# Allow any one" >> /etc/nginx/conf.d/ip_restriction
+			echo "	satisfy all;" > /etc/nginx/conf.d/ip_restriction
+			StatusLSB
+		else
+			log_daemon_msg "NginX - Not yet installed."
+			StatusLSB
+		fi
+		#### NginX - Satisfy all
+
+		#### Bind - Unblock inactive tracker domains
+		if [ "$ApplyConfigBind" == "YES" ]; then
+			log_daemon_msg "Bind - Unblock inactive tracker domains"
+			perl -pi -e "s/^include \"\/etc\/bind\/MySB.zones.blakclists\";/#include \"\/etc\/bind\/MySB.zones.blakclists\";/g" /etc/bind/named.conf.local
+			StatusLSB
+		else
+			log_daemon_msg "Bind - Not yet installed."
+			StatusLSB
+		fi
+		#### Bind - Unblock inactive tracker domains
+
+		#### START services
+		ManageServices start "nginx bind9"
+		#### START services
+
+		#### IPtables - SAVE Iptables Rules
+		iptables-save > /etc/iptables.up.rules
+		cp /etc/iptables.up.rules $MySB_InstallDir/files/current-iptables-rules
+		if [ "$IsInstalled_Webmin" == "YES" ] && [ -d /etc/webmin/firewall/ ]; then
+			cp /etc/iptables.up.rules /etc/webmin/firewall/iptables.save
+		fi
+		#### IPtables - SAVE Iptables Rules
+	;;
+
+	create)
+		#### STOP services
+		RestartRtorrentSessions "stop"
+		ManageServices stop "pglcmd fail2ban"
+		#### STOP services
+
+		#### Kernel - Loading modules
+		log_daemon_msg "Kernel - Loading modules"
+		if [ "$LoadKernelModules" == "YES" ]; then		
+			LoadingKernelModules
+		fi
+		StatusLSB
+		#### Kernel - Loading modules
+
+		#### Kernel - Parameter Configuration
+		log_daemon_msg "Kernel - Parameter Configuration"
+		if [ "$LoadKernelParameter" == "YES" ]; then
+			KernelParameterConfiguration
+		fi
+		StatusLSB
+		#### Kernel - Parameter Configuration
+
+		#### IPtables - Removal of existing rules
+		log_daemon_msg "IPtables - Removal of existing rules"
+		FlushingTables
+		StatusLSB
+		#### IPtables - Removal of existing rules
+
+		#### IPtables - Prohibit any incoming/outgoing connections
+		log_daemon_msg "IPtables - Prohibit any incoming/outgoing connections"
+		iptables -P INPUT DROP
+		iptables -P FORWARD DROP
+		iptables -P OUTPUT DROP
+		StatusLSB
+		#### IPtables - Prohibit any incoming/outgoing connections
+
+		#### IPtables - Creating user chains
+		log_daemon_msg "IPtables - Creating user chains"
+		CreatingUserChain
+		StatusLSB
+		#### IPtables - Creating user chains
+
+		#### IPtables - Populating user chains
+		log_daemon_msg "IPtables - Populating BAD chains"
+		PopulatingBadChain
+		StatusLSB
+		#### IPtables - Populating user chains
+
+		#### IPtables - Populating ICMP chain
+		Message="IPtables - Populating ICMP chain (allow seedbox users only)"
+		if [ ! -z "$ServerProvider" ] && [ "$ServerProvider" != "NONE" ]; then
+			Message="IPtables - Populating ICMP user chains (allow seedbox users and $ServerProvider)"
+		fi
+		log_daemon_msg "$Message"
+		PopulatingIcmpChain
+		StatusLSB
+		#### IPtables - Populating ICMP chain
+
+		#### IPtables - Populating UDP inboud user chain
+		log_daemon_msg "IPtables - Populating UDP inboud chain"
+		PopulatingUdpInboundChain
+		StatusLSB
+		#### IPtables - Populating UDP inboud chain
+
+		#### IPtables - Populating UDP outbound chain
+		log_daemon_msg "IPtables - Populating UDP outbound chain"
+		PopulatingUdpOutboundChain
+		StatusLSB
+		#### IPtables - Populating UDP outbound chain
+
+		#### IPtables - Populating TCP inboud user chain
+		log_daemon_msg "IPtables - Populating TCP inboud chain"
+		PopulatingTcpInboundChain
+		StatusLSB
+		#### IPtables - Populating TCP inboud chain
+
+		#### IPtables - Populating TCP outbound user chain
+		log_daemon_msg "IPtables - Populating TCP outbound chain"
+		PopulatingTcpOutboundChain
+		StatusLSB
+		#### IPtables - Populating TCP outbound chain
+
+		#### IPtables - Process INPUT chain
+		log_daemon_msg "IPtables - Process INPUT chain"
+		ProcessInputChain
+		StatusLSB
+		#### IPtables - Process INPUT chain
+
+		#### IPtables - Process FORWARD chain
+		log_daemon_msg "IPtables - Process FORWARD chain"
+		ProcessForwardChain
+		StatusLSB
+		#### IPtables - Process FORWARD chain
+
+		#### IPtables - Process OUTPUT chain
+		log_daemon_msg "IPtables - Process OUTPUT chain"
+		ProcessOutputChain
+		StatusLSB
+		#### IPtables - Process OUTPUT chain
+
+		#### IPtables - Process POSTROUTING chain
+		log_daemon_msg "IPtables - Process POSTROUTING chain"
+		ProcessPostroutingChain
+		StatusLSB
+		#### IPtables - Process POSTROUTING chain
+
+		#### Services - Create all security rules for services
+		CreateServicesRules
+		#### Services - Create all security rules for services
+
+		#### START services
+		ManageServices start "$ServicesToRestart"
+		RestartRtorrentSessions "start"
+		#### START services
+
+		#### Save Iptables Rules for Webmin
+		iptables-save > /etc/iptables.up.rules
+		cp /etc/iptables.up.rules $MySB_InstallDir/files/current-iptables-rules
+		if [ "$IsInstalled_Webmin" == "YES" ] && [ -d /etc/webmin/firewall/ ]; then
+			cp /etc/iptables.up.rules /etc/webmin/firewall/iptables.save
+		fi
+		#### Save Iptables Rules for Webmin
+	;;
+
+	refresh)
+		#### IPtables - SAVE Iptables Rules
+		log_daemon_msg "IPtables - SAVE Iptables Rules"
+		iptables-save > $MySB_InstallDir/temp/current-iptables-rules
+		StatusLSB
+		#### IPtables - SAVE Iptables Rules
+
+		#### IPtables - ALTER Iptables Rules
+		if [ "$ApplyIptablesUsers" == "YES" ]; then
+			log_daemon_msg "IPtables - Refresh rules for all users"
+
+			# icmp_packets chain
+			NumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'Allow ICMP for users' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/Allow ICMP for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			for ip in $AllUsersIPs; do
+				# ICMP
+				sed -i ""$NumLign"i\-A icmp_packets -s $ip -p icmp -m icmp --icmp-type 8 -m comment --comment \"Allow ICMP for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+				sed -i ""$NumLign"i\-A icmp_packets -s $ip -p icmp -m icmp --icmp-type 8 -m comment --comment \"Allow ICMP for users\" -j LOG --log-prefix \"fp=icmp_packets:2 a=ACCEPT\"\n" $MySB_InstallDir/temp/current-iptables-rules
+			done
+			# icmp_packets chain
+
+			# udp_inbound chain
+			NumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'NTP for users' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/NTP for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			for ip in $AllUsersIPs; do
+				# NTP
+				sed -i ""$NumLign"i\-A udp_inbound -s $ip -p udp -m udp --dport 123 -m comment --comment \"NTP for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+			done
+			# udp_inbound chain
+
+			# tcp_inbound chain
+			NumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'SSH and SFTP for users' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/SSH and SFTP for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			sed -i '/FTP for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			sed -i '/FTP Data for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			sed -i '/FTP Passive for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			for ip in $AllUsersIPs; do
+				# SSH and SFTP
+				sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_SSH -m comment --comment \"SSH and SFTP for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+				# FTP
+				sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_FTP -m comment --comment \"FTP for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+				# FTP Data
+				sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --sport $Port_FTP_Data -m comment --comment \"FTP Data for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+				# FTP Passive
+				sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_FTP_Passive -m comment --comment \"FTP Passive for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+
+				# OpenVPN TCP
+				# if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+					# sed -i '/OpenVPN with GW for users/d' $MySB_InstallDir/temp/current-iptables-rules
+					# sed -i '/OpenVPN without GW for users/d' $MySB_InstallDir/temp/current-iptables-rules
+					# sed -i '/OpenVPN bridged without GW for users/d' $MySB_InstallDir/temp/current-iptables-rules
+					# case "$OpenVPN_Proto" in
+						# "tcp")
+							# sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_OpenVPN_WithGW -m comment --comment \"OpenVPN with GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+							# sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_OpenVPN_WithoutGW -m comment --comment \"OpenVPN without GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+							# sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Port_OpenVPN_TAP_WithoutGW -m comment --comment \"OpenVPN bridged without GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+						# ;;
+						# "udp")
+							# sed -i ""$NumLign"i\-A udp_inbound -s $ip -p udp -m udp --dport $Port_OpenVPN_WithGW -m comment --comment \"OpenVPN with GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+							# sed -i ""$NumLign"i\-A udp_inbound -s $ip -p udp -m udp --dport $Port_OpenVPN_WithoutGW -m comment --comment \"OpenVPN without GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+							# sed -i ""$NumLign"i\-A udp_inbound -s $ip -p udp -m udp --dport $Port_OpenVPN_TAP_WithoutGW -m comment --comment \"OpenVPN bridged without GW for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+						# ;;
+					# esac
+				# fi
+			done
+
+			rTorrentNumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'rTorrent for users' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/rTorrent for users/d' $MySB_InstallDir/temp/current-iptables-rules
+			for FnUser in $UsersList; do
+				# Webmin
+				if [ "$IsInstalled_Webmin" == "YES" ] && [ "$FnUser" == "$MainUser" ]; then
+					NumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'Webmin for main user' -n -m 1 | cut -d ':' -f 1)
+					sed -i '/Webmin for main user/d' $MySB_InstallDir/temp/current-iptables-rules
+					for ip in $MainUserIPs; do
+						sed -i ""$NumLign"i\-A tcp_inbound -s $ip -p tcp -m tcp --dport $Ports_Webmin -m comment --comment \"Webmin for main user\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+					done
+				fi
+
+				# rTorrent
+				PORT_START="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT scgi_port FROM users WHERE users_ident = '$FnUser'\"`"
+				PORT_END="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT rtorrent_port FROM users WHERE users_ident = '$FnUser'\"`"
+				sed -i ""$rTorrentNumLign"i\-A tcp_inbound -s 0/0 -p tcp -m tcp --dport $PORT_START:$PORT_END -m comment --comment \"rTorrent for users\" -j ACCEPT\n" $MySB_InstallDir/temp/current-iptables-rules
+			done
+			# tcp_inbound chain
+
+			StatusLSB
+		fi
+		if [ "$ApplyIptablesDnscrypt" == "YES" ]; then
+			NumLign=$(cat $MySB_InstallDir/temp/current-iptables-rules | grep 'DNScrypt-proxy' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/DNScrypt-proxy/d' $MySB_InstallDir/temp/current-iptables-rules
+
+			for Resolver in $ResolverName; do
+				ResolverAddress="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT resolver_address FROM dnscrypt_resolvers WHERE name = '$Resolver'\"`"
+				ResolverPort="`echo $ResolverAddress | awk -F: '{ print $2 }'`"
+				ResolverAddress="`echo $ResolverAddress | awk -F: '{ print $1 }'`"
+				if [ -z "$ResolverPort" ]; then ResolverPort="443"; fi
+
+				sed -i ""$NumLign"i\-A udp_inbound -s $ResolverAddress/32 -p udp -m udp --dport $ResolverPort -m comment --comment \"DNScrypt-proxy: $Resolver\" -j ACCEPT" $MySB_InstallDir/temp/current-iptables-rules
+			done
+		fi
+		#### IPtables - ALTER Iptables Rules
+	
+		#### Services - Create all security rules for services
+		CreateServicesRules
+		#### Services - Create all security rules for services
+
+		#### IPtables - RESTORE Iptables Rules
+		log_daemon_msg "IPtables - RESTORE Iptables Rules"
+		iptables-restore < $MySB_InstallDir/temp/current-iptables-rules
+		StatusLSB
+		#### IPtables - RESTORE Iptables Rules
+
+		#### START services
+		ManageServices start "$ServicesToRestart"
+		#### START services
+
+		#### Save Iptables Rules for Webmin
+		iptables-save > /etc/iptables.up.rules
+		cp /etc/iptables.up.rules $MySB_InstallDir/files/current-iptables-rules
+		if [ "$IsInstalled_PeerGuardian" == "YES" ] && [ -d /etc/webmin/firewall/ ]; then
+			cp /etc/iptables.up.rules /etc/webmin/firewall/iptables.save
+		fi
+
+		if CheckCommand 0 postfix && GetPid $Service; then postfix flush; fi
+		
+		RestartRtorrentSessions "start"
+	;;
+
+	*)
+		echo -e "${CBLUE}Usage:$CEND	${CYELLOW}bash $ScriptName$CEND ${CGREEN}{clean|create|refresh}$CEND"
+		echo
+		END=OFF
+		EndingScript 0
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

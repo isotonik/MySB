@@ -1,0 +1,717 @@
+#!/bin/bash
+# -----------------------------------------
+if [ -f $(dirname $0)/../inc/includes_before ]; then source $(dirname $0)/../inc/includes_before; fi
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$1" != "manual" ] || [ -z "$1" ]; then
+	if [ "`screen -ls | grep MySB`" == "" ]; then
+		echo ""
+		echo -e "${CRED}I am sorry, but you must start installation with$CEND ${CGREEN}MySB_Install.bsh$CEND${CRED}, aborting!$CEND"
+		exit 1
+	fi
+fi
+
+#### Advertising
+echo
+echo -e "${CRED}############################################################$CEND"
+echo -e "${CRED}#$CEND ${CYELLOW}At the end of the installation, you will receive an email.$CEND"
+echo -e "${CRED}#$CEND ${CYELLOW}It lists information about your account.$CEND"
+echo -e "${CRED}# IMPORTANT:$CEND ${CYELLOW}Remember to also check the SPAM folder...$CEND"
+echo -e "${CRED}############################################################$CEND"
+echo
+
+echo
+echo -e "${CRED}If you lose connection during installation, restart the SSH session and run the following command:$CEND"
+echo -e "${CGREEN}	screen -r MySB$CEND"
+echo -e "${CRED}Beware, during installation, the SSH port will be changed. If a port session 22 does not work, try with the new port that you have selected (maybe is 8892).$CEND"
+echo
+
+echo
+echo -e "${CBLUE}When a user is added, it will receive a confirmation email.$CEND"
+echo -e "${CBLUE}He will have to change their password.$CEND"
+echo -e "${CBLUE}Its IP address will also be added automatically.$CEND"
+echo
+echo
+
+echo -e "${CYELLOW}All is ok for start the install of MySB.$CEND"
+echo
+QuestionGetString NO  "Do you want to continue, type 'yes' ?" CONTINUE YES
+if [ "$CONTINUE" == "NO" ]; then
+	echo -e "${CYELLOW}OK, see you later...$CEND"
+	echo
+	echo
+	EndingScript 0
+else
+	#### Create MySB banner
+	if [ "$BANNER" == "ON" ]; then
+		BannerGenerator
+	fi
+
+	#### Advertising
+	echo
+	echo -e "${CRED}############################################################$CEND"
+	echo -e "${CRED}#$CEND ${CYELLOW}At the end of the installation, you will receive an email.$CEND"
+	echo -e "${CRED}#$CEND ${CYELLOW}It lists information about your account.$CEND"
+	echo -e "${CRED}# IMPORTANT:$CEND ${CYELLOW}Remember to also check the SPAM folder...$CEND"
+	echo -e "${CRED}############################################################$CEND"
+	echo
+	echo
+	echo -e "${CRED}If you lose connection during installation, restart the SSH session and run the following command:$CEND"
+	echo -e "${CGREEN}	screen -r MySB$CEND"
+	echo -e "${CRED}Beware, during installation, the SSH port will be changed. If a port session 22 does not work, try with the new port that you have selected (maybe is 8892).$CEND"
+	echo	
+
+	REBOOT=NO
+fi
+
+#### Count steps
+CurrentSTEP=0
+TotalSTEP=19
+if [ "$ServerProvider" == "OVH" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_Cakebox" == "YES" ] || [ "$ToInstall_Manager" == "YES" ]; then # Tools
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_Cakebox" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_Manager" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_OpenVPN" == "YES" ]; then
+	TotalSTEP=$(( TotalSTEP+3 ))
+fi
+if [ "$ToInstall_Fail2Ban" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_Webmin" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_LogWatch" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_PlexMedia" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+if [ "$ToInstall_DNScrypt" == "YES" ]; then
+	(( TotalSTEP++ ))
+fi
+case $MySB_PeerBlock in
+	PeerGuardian)
+		TotalSTEP=$(( TotalSTEP+2 ))
+	;;
+	*)
+		(( TotalSTEP++ ))
+	;;
+esac
+
+#
+########## PREPARE - BoF ##########
+#
+echo -e "${CYELLOW}#### Preparing the installation ####$CEND"
+
+#### 0 - Getting information about OVH monitoring engine
+if [ "$ServerProvider" == "OVH" ] || [ "$ServerProvider" == "ONLINE" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Monitoring$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Monitoring
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Getting information about OVH monitoring servers$CEND..."
+		screen -dmS Monitoring /bin/bash $MySB_InstallDir/install/Monitoring 'INSTALL';
+		WaitingScreen Monitoring
+		StatusSTD
+	fi
+fi
+
+#### 1 - Create basic security rules
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/bin/MySB_SecurityRules create$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/bin/MySB_SecurityRules create
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Creating security rules$CEND..."
+	screen -dmS MySB_SecurityRules /bin/bash $MySB_InstallDir/bin/MySB_SecurityRules 'create' 'INSTALL';
+	WaitingScreen MySB_SecurityRules
+	StatusSTD
+fi
+
+#### 2 - Tweaks
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Tweaks$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Tweaks
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- System optimizations$CEND..."
+	screen -dmS Tweaks /bin/bash $MySB_InstallDir/install/Tweaks 'INSTALL';
+	WaitingScreen Tweaks
+	StatusSTD
+fi
+
+#### 3 - SourcesList
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/SourcesList$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/SourcesList
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Preparing sources for debian$CEND..."
+	screen -dmS SourcesList /bin/bash $MySB_InstallDir/install/SourcesList 'INSTALL';
+	WaitingScreen SourcesList
+	StatusSTD
+fi
+
+#### 4 - Packages
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Packages$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Packages
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing all needed packages$CEND..."
+	screen -dmS Packages /bin/bash $MySB_InstallDir/install/Packages 'INSTALL';
+	WaitingScreen Packages
+	StatusSTD
+fi
+
+#### 5 - DownloadAll
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/DownloadAll$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/DownloadAll
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Downloading all files at once (GIT, SVN, TAR.GZ, WBM)$CEND..."
+	screen -dmS DownloadAll /bin/bash $MySB_InstallDir/install/DownloadAll 'INSTALL';
+	WaitingScreen DownloadAll
+	StatusSTD
+fi
+
+if [ -f $MySB_InstallDir/temp/continue ]; then
+	echo ""
+	echo -e "${CRED}Important files could not be downloaded, aborting !$CEND"
+	echo
+	cat $MySB_InstallDir/temp/continue
+	EndingScript 1
+fi
+
+#### 6 - Certificates
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Certificates 'CreateCACertificate'$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Certificates 'CreateCACertificate'
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Generating CA certificate$CEND..."
+	screen -dmS Certificates /bin/bash $MySB_InstallDir/install/Certificates 'CreateCACertificate' 'NoServiceNameToGive' 'INSTALL';
+	WaitingScreen Certificates
+	StatusSTD
+fi
+
+#
+########## PREPARE - EoF ##########
+#
+
+#
+########## SECURITY - BoF ##########
+#
+echo
+echo -e "${CYELLOW}#### Applying security rules ####$CEND"
+
+#### 7 - RKHunter
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/RKHunter$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/RKHunter
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring RKHunter$CEND..."
+	screen -dmS RKHunter /bin/bash $MySB_InstallDir/install/RKHunter 'INSTALL';
+	WaitingScreen RKHunter
+	StatusSTD
+fi
+
+#### 8 - Fail2Ban
+if [ "$ToInstall_Fail2Ban" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Fail2Ban$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Fail2Ban
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Fail2Ban$CEND..."
+		screen -dmS Fail2Ban /bin/bash $MySB_InstallDir/install/Fail2Ban 'INSTALL';
+		WaitingScreen Fail2Ban
+		StatusSTD
+	fi
+fi
+
+#### 9 - Bind
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Bind$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Bind
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring BIND$CEND..."
+	screen -dmS Bind /bin/bash $MySB_InstallDir/install/Bind 'INSTALL';
+	WaitingScreen Bind
+	StatusSTD
+fi
+
+if [ -f $MySB_InstallDir/temp/continue ]; then
+	echo ""
+	echo -e "${CRED}Bind is not running, aborting !$CEND"
+	echo
+	cat $MySB_InstallDir/temp/continue
+	EndingScript 1
+fi
+
+### 10 - DNScrypt-proxy
+if [ "$ToInstall_DNScrypt" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/DNScrypt$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/DNScrypt
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring DNScrypt-proxy$CEND..."
+		screen -dmS DNScrypt /bin/bash $MySB_InstallDir/install/DNScrypt 'INSTALL';
+		WaitingScreen DNScrypt
+		StatusSTD
+	fi
+	
+	if [ -f $MySB_InstallDir/temp/continue ]; then
+		echo ""
+		echo -e "${CRED}DNScrypt-proxy is not running, aborting !$CEND"
+		echo
+		cat $MySB_InstallDir/temp/continue
+		EndingScript 1
+	fi	
+fi
+
+#### 11 - BlockList / PeerGuardian
+case $MySB_PeerBlock in
+	PeerGuardian)
+		(( CurrentSTEP++ ))
+		if [ "$1" == "manual" ]; then
+			clear
+			echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/PeerGuardian$CEND"
+			read -p "Press [Enter] key to continue..."
+			/bin/bash $MySB_InstallDir/install/PeerGuardian
+		else
+			echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring PeerGuardian, and updating all blocklists (this may take a while, please wait)$CEND..."
+			screen -dmS PeerGuardian /bin/bash $MySB_InstallDir/install/PeerGuardian 'INSTALL';
+			WaitingScreen PeerGuardian
+			StatusSTD
+		fi
+		
+		(( CurrentSTEP++ ))
+		if [ "$1" == "manual" ]; then
+			clear
+			echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Blocklists$CEND"
+			read -p "Press [Enter] key to continue..."
+			/bin/bash $MySB_InstallDir/install/Blocklists
+		else
+			echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Compiling the rTorrent blocklist$CEND..."
+			screen -dmS Blocklist /bin/bash $MySB_InstallDir/install/Blocklists 'INSTALL';
+			WaitingScreen Blocklist
+			StatusSTD
+		fi		
+	;;
+	rTorrent)
+		(( CurrentSTEP++ ))
+		if [ "$1" == "manual" ]; then
+			clear
+			echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Blocklists$CEND"
+			read -p "Press [Enter] key to continue..."
+			/bin/bash $MySB_InstallDir/install/Blocklists
+		else
+			echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Compiling the rTorrent blocklist$CEND..."
+			screen -dmS Blocklist /bin/bash $MySB_InstallDir/install/Blocklists 'INSTALL';
+			WaitingScreen Blocklist
+			StatusSTD
+		fi
+	;;	
+	*)
+		(( CurrentSTEP++ ))
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Don't use any blocklist$CEND..."
+		StatusSTD
+	;;
+esac
+
+#
+########## SECURITY - EoF ##########
+#
+
+#
+########## INSTALLATION - BoF ##########
+#
+echo
+echo -e "${CYELLOW}#### Installing all services ####$CEND"
+
+#### 12 - PHP
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/PHP$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/PHP
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring PHP5$CEND..."
+	screen -dmS PHP /bin/bash $MySB_InstallDir/install/PHP 'INSTALL';
+	WaitingScreen PHP
+	StatusSTD
+fi
+
+#### 13 - SSH
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/SSH$CEND"
+	/bin/bash $MySB_InstallDir/install/SSH
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring SSH$CEND..."
+	screen -dmS SSH /bin/bash $MySB_InstallDir/install/SSH 'INSTALL';
+	WaitingScreen SSH
+	StatusSTD
+fi
+
+#### 14 - Postfix
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Postfix$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Postfix
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Postfix$CEND..."
+	screen -dmS Postfix /bin/bash $MySB_InstallDir/install/Postfix 'INSTALL';
+	WaitingScreen Postfix
+	StatusSTD
+fi
+
+#### 15 - Nginx
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Nginx$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/Nginx
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring NginX$CEND..."
+	screen -dmS Nginx /bin/bash $MySB_InstallDir/install/Nginx 'INSTALL';
+	WaitingScreen Nginx
+	StatusSTD
+fi
+
+#### 16 - LoadAvg
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/LoadAvg$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/LoadAvg
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring LoadAvg$CEND..."
+	screen -dmS LoadAvg /bin/bash $MySB_InstallDir/install/LoadAvg 'INSTALL';
+	WaitingScreen LoadAvg
+	StatusSTD
+fi
+
+#### 17 - VSFTP
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/VSFTP$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/VSFTP
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring VSFTPd$CEND..."
+	screen -dmS VSFTP /bin/bash $MySB_InstallDir/install/VSFTP 'INSTALL';
+	WaitingScreen VSFTP
+	StatusSTD
+fi
+
+#### 18 - rTorrent
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/rTorrent$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/rTorrent
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring rTorrent$CEND..."
+	screen -dmS rTorrent /bin/bash $MySB_InstallDir/install/rTorrent 'INSTALL';
+	WaitingScreen rTorrent
+	StatusSTD
+fi
+
+#### 19 - ruTorrent
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/ruTorrent$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/install/ruTorrent
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring ruTorrent with plugins, and check of all the trackers (this may take a while, please wait)$CEND..."
+	screen -dmS ruTorrent /bin/bash $MySB_InstallDir/install/ruTorrent 'INSTALL';
+	WaitingScreen ruTorrent
+	StatusSTD
+fi
+
+#### 20 - Tools
+if [ "$ToInstall_Cakebox" == "YES" ] || [ "$ToInstall_Manager" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Tools$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Tools
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Composer, Bower and NodeJS$CEND..."
+		screen -dmS Tools /bin/bash $MySB_InstallDir/install/Tools 'INSTALL';
+		WaitingScreen Tools
+		StatusSTD
+	fi
+fi
+
+#### 21 - SeedboxManager
+if [ "$ToInstall_Manager" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/SeedboxManager$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/SeedboxManager
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Seedbox-Manager$CEND..."
+		screen -dmS SeedboxManager /bin/bash $MySB_InstallDir/install/SeedboxManager 'INSTALL';
+		WaitingScreen SeedboxManager
+		StatusSTD
+	fi
+fi
+
+#### 22 - CakeboxLight
+if [ "$ToInstall_Cakebox" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/CakeboxLight$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/CakeboxLight
+	else	
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring CakeBox-Light$CEND..."
+		screen -dmS CakeboxLight /bin/bash $MySB_InstallDir/install/CakeboxLight 'INSTALL';
+		WaitingScreen CakeboxLight
+		StatusSTD
+	fi
+fi
+
+if [ "$ToInstall_OpenVPN" == "YES" ]; then
+	#### 23a - OpenVPN
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/OpenVPN \"server\"$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/OpenVPN "server"
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring OpenVPN$CEND..."
+		screen -dmS OpenVPN /bin/bash $MySB_InstallDir/install/OpenVPN 'server' 'INSTALL';	
+		WaitingScreen OpenVPN
+		StatusSTD
+	fi
+
+	#### 23b - Samba
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Samba$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Samba
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Samba$CEND..."
+		screen -dmS Samba /bin/bash $MySB_InstallDir/install/Samba 'INSTALL';	
+		WaitingScreen Samba
+		StatusSTD
+	fi
+
+	#### 23c - NFS
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/NFS$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/NFS
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring NFS$CEND..."
+		screen -dmS NFS /bin/bash $MySB_InstallDir/install/NFS 'INSTALL';	
+		WaitingScreen NFS
+		StatusSTD
+	fi
+fi
+
+#### 24 - Webmin
+if [ "$ToInstall_Webmin" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Webmin$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Webmin
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Webmin$CEND..."
+		screen -dmS Webmin /bin/bash $MySB_InstallDir/install/Webmin 'INSTALL';
+		WaitingScreen Webmin
+		StatusSTD
+	fi
+fi
+
+#### 25 - Logwatch
+if [ "$ToInstall_LogWatch" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/Logwatch$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/Logwatch
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring Logwatch$CEND..."
+		screen -dmS Logwatch /bin/bash $MySB_InstallDir/install/Logwatch 'INSTALL';
+		WaitingScreen Logwatch
+		StatusSTD
+	fi
+fi
+
+### 26 - PlexMedia
+if [ "$ToInstall_PlexMedia" == "YES" ]; then
+	(( CurrentSTEP++ ))
+	if [ "$1" == "manual" ]; then
+		clear
+		echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/install/PlexMedia$CEND"
+		read -p "Press [Enter] key to continue..."
+		/bin/bash $MySB_InstallDir/install/PlexMedia
+	else
+		echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Installing and configuring PlexMedia$CEND..."
+		screen -dmS PlexMedia /bin/bash $MySB_InstallDir/install/PlexMedia 'INSTALL';
+		WaitingScreen PlexMedia
+		StatusSTD
+	fi
+fi
+
+#### 27 - MySB_CreateUser
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- /bin/bash $MySB_InstallDir/bin/MySB_CreateUser \"$MainUser\" \"INSTALL\"$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/bin/MySB_CreateUser "$MainUser" "INSTALL"
+else
+	echo  -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Creating the main user named \"$MainUser\"$CEND..."
+	screen -dmS MySB_CreateUser /bin/bash $MySB_InstallDir/bin/MySB_CreateUser "$MainUser" "INSTALL";
+	WaitingScreen MySB_CreateUser
+	StatusSTD
+fi
+
+#### 28 - Modify rights and owner for directories and files
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Modifying of rights and owners for directories and files$CEND..."
+ManageDirectoriesAndFiles
+StatusSTD
+
+#### 29 - Create final security rules
+(( CurrentSTEP++ ))
+if [ "$1" == "manual" ]; then
+	clear
+	echo -e "${CGREEN}$CurrentSTEP/$TotalSTEP	- source $MySB_InstallDir/bin/MySB_SecurityRules create$CEND"
+	read -p "Press [Enter] key to continue..."
+	/bin/bash $MySB_InstallDir/bin/MySB_SecurityRules create
+else
+	echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- Creating final security rules$CEND..."
+	screen -dmS MySB_SecurityRules /bin/bash $MySB_InstallDir/bin/MySB_SecurityRules 'create' 'INSTALL';
+	WaitingScreen MySB_SecurityRules
+	StatusSTD
+fi
+
+#
+########## INSTALLATION - EoF ##########
+#
+
+echo
+echo -e "${CGREEN}Looks like everything is set.$CEND"
+echo
+echo -e "${CYELLOW}Remember that your SSH port is now ======>$CEND ${CBLUE}$Port_SSH$CEND"
+echo
+echo -e "${CRED}System will reboot in 30 seconds.$CEND"
+echo
+echo -e "${CBLUE}Available commands for your seedbox:$CEND"
+echo -e "${CYELLOW}	User Management:$CEND"
+echo -e "${CGREEN}			MySB_ChangeUserPassword$CEND"
+echo -e "${CGREEN}			MySB_CreateUser$CEND"
+echo -e "${CGREEN}			MySB_DeleteUser$CEND"
+echo -e "${CYELLOW}	SeedBox Management:$CEND"
+echo -e "${CGREEN}			MySB_RefreshMe (refresh installation of rTorrent OR ruTorrent OR Seedbox-Manager OR Cakebox)$CEND"
+echo -e "${CGREEN}			MySB_UpgradeSystem$CEND (like 'aptitude update + aptitude upgrade')"
+echo -e "${CYELLOW}	MySB Management:$CEND"
+echo -e "${CGREEN}			MySB_GitHubRepoUpdate$CEND (update actual repository)"
+echo -e "${CGREEN}			MySB_UpgradeMe$CEND (if new versions)"
+echo -e "${CGREEN}			MySB_SecurityRules$CEND (to create/clean/refresh all security rules)"
+echo -e "${CYELLOW}	Main scripts:$CEND"
+echo -e "${CGREEN}			BlocklistsRTorrent.bsh$CEND (create Blocklists for rTorrent)"
+echo -e "${CGREEN}			DynamicAddressResolver.bsh$CEND (cron job every 5 minutes, it will check all dynamic hostname for users)"
+echo -e "${CGREEN}			GetTrackersCert.bsh$CEND (check if trackers use SSL connection and get certificate)"
+
+echo
+echo
+echo -e "${CBLUE}As main user, you can manage bloclists, trackers and more via MySB portal, available here:$CEND"
+echo -e "	-->	${CYELLOW}https://$HostNameFQDN:$Port_HTTPS/$CEND"
+
+#### 29 - Reboot after install
+if [ "$1" == "manual" ]; then
+	QuestionGetString NO  "Do you want to reboot now, type 'yes' or 'no' ?" REBOOT NO
+else
+	REBOOT=YES
+fi
+
+# -----------------------------------------
+if [ -f $(dirname $0)/../inc/includes_after ]; then source $(dirname $0)/../inc/includes_after; fi
+# -----------------------------------------
+##################### LAST LINE ######################################

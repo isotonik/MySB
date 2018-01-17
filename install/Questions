@@ -1,0 +1,417 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+MySB_Install_PID=$1
+TYPE=$2
+
+case "$TYPE" in
+	"INSTALL")
+		DisplayInfo=YES
+		DisplayUserInfo=YES
+		DisplayServerInfo=YES
+		DisplayServices=YES
+		DisplaySecurity=YES
+	;;
+	"UPGRADE")
+		DisplayInfo=NO
+		DisplayUserInfo=NO
+		DisplayServerInfo=NO
+		DisplayServices=YES
+		DisplaySecurity=YES
+	;;
+esac
+
+#### Advertising
+if [ "$DisplayInfo" == "YES" ]; then
+	echo
+	echo -e "${CRED}############################################################$CEND"
+	echo -e "${CRED}#$CEND ${CYELLOW}At the end of the installation, you will receive an email.$CEND"
+	echo -e "${CRED}#$CEND ${CYELLOW}It lists information about your account.$CEND"
+	echo -e "${CRED}# IMPORTANT:$CEND ${CYELLOW}Remember to also check the SPAM folder...$CEND"
+	echo -e "${CRED}############################################################$CEND"
+	echo
+
+	echo
+	echo -e "${CGREEN}############################################################$CEND"
+	echo -e "${CGREEN}#$CEND	${CYELLOW}Now, I need some informations.$CEND"
+	echo -e "${CGREEN}############################################################$CEND"
+	echo
+fi
+
+#### MAIN USER INFO
+if [ "$DisplayUserInfo" == "YES" ]; then
+	if [ "$DisplayInfo" == "YES" ]; then
+		echo -e "${CYELLOW}#### Main User Info ####$CEND"
+	fi
+
+	# Username
+	while [ "`echo $NEWUSER | grep '@'`" != "" ] || [ -z "$NEWUSER" ]; do
+		QuestionGetString NO "Username for the first user for your seedbox (main user): " NEWUSER
+	done
+
+	# User password
+	echo
+	if [ -z "$PASSWORD" ] && [ "$TYPE" != "UPGRADE" ]; then
+		QuestionGetString YES "Password for this user (NO spaces): " PASSWORD
+	fi
+
+	# User IP addresses
+	echo
+	echo -e "${CYELLOW}If you do not want to activate the restriction by IP for access to your server, just type: $CEND${CGREEN}NO$CEND"
+	echo -e "${CRED}But I think this is NOT a very good idea !$CEND ${CYELLOW}But it's not my problem...$CEND"
+	echo -e "${CYELLOW}However, you will still need to add at least one IP to the next question.$CEND"
+	echo -e "${CYELLOW}Just remember that Fail2Ban and PeerGuardian may have to block you...$CEND"
+	QuestionGetString NO "Do you want to use the IP restriction ?" IpRestriction YES
+	
+	echo
+	echo -e "${CYELLOW}Add now, at least one of your public IP addresses that will be allowed to connect to your server for all services (whitelist).$CEND"
+	echo -e "${CYELLOW}You will be able to manage this list later on the portal, and also adding dynamic IP with hostnames (DynDN, No-IP,...).$CEND"
+	echo -e "${CYELLOW}You also have the possibility to add as many addresses (IP or hostname) that you want through the portal.$CEND"
+
+	
+	while [ "$CHECK_MYIP" != "$MainUserIPs" ] || [ -z "$MainUserIPs" ]; do
+		MainUserIPs="`echo $SSH_CLIENT | awk '{ print $1 }'`"
+		if [ -z "$MainUserIPs" ]; then
+			MainUserIPs="`who --ips | awk '{print $6}' | grep ^[0123456789]`"
+			if [ -z "$MainUserIPs" ]; then
+				MainUserIPs="`who --ips | awk '{print $5}' | grep ^[0123456789]`"
+			fi
+		fi
+
+		QuestionGetString NO "What are your personal IP public addresses ? (ex: x.x.x.x,y.y.y.y)" MainUserIPs $MainUserIPs
+		IFS=$','
+		for ip in $MainUserIPs; do 
+			TEMP=`ValidateIP "$ip"`
+			if [ ! -z $TEMP ]; then CHECK_MYIP="$CHECK_MYIP $TEMP"; fi
+		done
+		unset IFS
+		CHECK_MYIP="`echo $CHECK_MYIP | sed -e "s/\ /\,/g;" | sed -e "s/^$//g;"`"
+	done
+
+	# SMTP ?
+	echo
+	echo -e "${CYELLOW}Do you want to use an external SMTP server ? (Good for safe sending emails.).$CEND"
+	echo -e "${CYELLOW}Choose between ${CGREEN}LOCAL$CEND${CYELLOW} or listed providers $CEND${CGREEN}FREE$CEND|$CEND${CGREEN}OVH$CEND${CYELLOW}|$CEND${CGREEN}GMAIL$CEND|$CEND${CGREEN}YAHOO$CEND${CYELLOW}. Only SSL transactions will be used (SSL/465).$CEND"
+	echo -e "${CYELLOW}I recommend you to use a provider. This reduces the risk that the mails sent by the server is considered like spam.$CEND"
+	echo -e "${CYELLOW}You can change your choice later with the MySB portal.$CEND"
+	SMTP_Provider=""
+	while [ ! "$SMTP_Provider" = "LOCAL" ] \
+		&& [ ! "$SMTP_Provider" = "FREE" ] \
+		&& [ ! "$SMTP_Provider" = "OVH" ] \
+		&& [ ! "$SMTP_Provider" = "GMAIL" ] \
+		&& [ ! "$SMTP_Provider" = "YAHOO" ]; do
+
+		QuestionGetString NO "What is your SMTP provider ? " SMTP_Provider $SMTP_Provider
+	done
+
+	SMTP_Provider=`echo $SMTP_Provider | tr '[:lower:]' '[:upper:]'`
+	if [ "$SMTP_Provider" != "LOCAL" ]; then
+		QuestionGetString NO "What is the username for the SMTP server ${CGREEN}$SMTP_Provider$CEND ?" SMTP_Username
+		QuestionGetString YES "What is the password for the SMTP server ${CGREEN}$SMTP_Provider$CEND ?" SMTP_Password
+	fi
+
+	# User e-mail
+	if [ "$SMTP_Provider" != "LOCAL" ]; then
+		echo
+		echo -e "${CYELLOW}Be careful when entering your e-mail address!$CEND"
+		echo -e "${CYELLOW}If the input address is wrong, you will not receive the confirmation email ...$CEND"
+		echo -e "${CYELLOW}If you selected a different provider that LOCAL to the previous question,$CEND"
+		echo -e "${CYELLOW}you must enter here email address corresponding to the SMTP account you specified.$CEND"
+	fi
+	while [ ! "`ValidateMail $MainUserEmail`" = "1" ] || [ -z "$MainUserEmail" ]; do
+		QuestionGetString NO "What's your e-mail address ?" MainUserEmail
+	done
+fi
+
+#### SERVER INFO
+if [ "$DisplayServerInfo" == "YES" ]; then
+	if [ "$DisplayInfo" == "YES" ]; then
+		echo
+		echo -e "${CYELLOW}#### Server Info ####$CEND"
+	fi
+	
+	#Time Zone
+	echo
+	QuestionGetString NO "What is your time zone ? (ex: Europe/Paris): " TimeZone "Europe/Paris"
+
+	# Primary Inet
+	QuestionGetString NO "What is your primary network interface ? (ex: eth0, nic0, ...): " PrimaryInet $PrimaryInet
+
+	# Box' IP
+	while [ ! "$CHECK_SrvIpAddress" = "$SrvIpAddress" ] || [ -z "$SrvIpAddress" ]; do
+		QuestionGetString NO  "What is the IP address of your box: " SrvIpAddress $SrvIpAddress
+		CHECK_SrvIpAddress=`ValidateIP "$SrvIpAddress"`
+	done
+
+	# Box' hostname
+	QuestionGetString NO "What is the hostname (FQDN) of your box: " HostNameFQDN $HostNameFQDN
+
+	# NginX HTTP port
+	#QuestionGetString NO "NginX HTTP port (usually 80): " Port_HTTP $Port_HTTP
+
+	# NginX HTTPs port
+	QuestionGetString NO "NginX HTTPs port (usually 443): " Port_HTTPS $Port_HTTPS
+
+	# SSH port
+	QuestionGetString NO "SSH port (usually 22): " Port_SSH $Port_SSH
+
+	# FTP port
+	QuestionGetString NO "FTPs port (usually 990): " Port_FTP $Port_FTP
+
+	# FTP Active data port
+	#QuestionGetString NO "FTP Active Data port (usually 20): " Port_FTP_Data $Port_FTP_Data
+fi
+
+#### SERVICES
+if [ "$DisplayServices" == "YES" ]; then
+	if [ "$DisplayInfo" == "YES" ]; then
+		echo
+		echo -e "${CYELLOW}#### Services ####$CEND"
+	fi
+
+	#Provider
+	echo -e "${CYELLOW}Maybe you want to monitoring your server with a service proposed by your provider ?$CEND"
+	echo -e "${CYELLOW}Choose between ${CGREEN}none$CEND${CYELLOW} or listed providers $CEND${CGREEN}OVH$CEND|$CEND${CGREEN}ONLINE$CEND${CYELLOW}.$CEND"
+	echo -e "${CYELLOW}This will allow the PING from this provider.$CEND"
+	echo -e "${CRED}I don't recommend this... So, I you don't use monitoring, please disable it in the provider interface...$CEND"
+	echo -e "${CRED}If you don't enable it here AND it is enable with your provider, you server can be rebooted in Rescue Mode by the OVH staff...$CEND"
+	echo -e "${CYELLOW}It would be wiser to disable the monitoring function in your provider's interface.$CEND"
+	echo -e "${CRED}In case you want to use the monitoring, first disable the service NOW in your provider's interface.$CEND"
+	echo -e "${CRED}You can reactivate it AFTER the end of the installation of MySB.$CEND"
+	QuestionGetString NO "What is your server provider ?: " ServerProvider none
+	ServerProvider="`echo $ServerProvider | tr '[:lower:]' '[:upper:]'`"	
+	
+	# Seedbox-Manager
+	if [ "$IsInstalled_Manager" != "YES" ]; then
+		QuestionGetString NO "Install Seedbox-Manager ? " ToInstall_Manager NO
+	fi
+
+	# Cakebox Light
+	if [ "$IsInstalled_Cakebox" != "YES" ]; then
+		echo
+		QuestionGetString NO "Install CakeBox Light ? " ToInstall_Cakebox YES
+		# if [ "$ToInstall_Cakebox" == "YES" ]; then
+			# QuestionGetString NO "CakeBox port: " Ports_Cakebox $Ports_Cakebox
+		# fi
+	fi
+
+	# Plexmedia server
+	if [ "$IsInstalled_PlexMedia" != "YES" ]; then
+		echo
+		QuestionGetString NO "Install Plex Media ? " ToInstall_PlexMedia NO
+	fi
+
+	# Webmin
+	if [ "$IsInstalled_Webmin" != "YES" ]; then
+		echo
+		QuestionGetString NO "Install Webmin ? " ToInstall_Webmin NO
+		if [ "$ToInstall_Webmin" == "YES" ]; then
+			QuestionGetString NO "Webmin port (usually 10000): " Ports_Webmin $Ports_Webmin
+		fi
+	fi
+
+	# OpenVPN
+	if [ "$IsInstalled_OpenVPN" != "YES" ]; then
+		echo
+		if [ "`ls -la /dev/net/tun > /dev/null && echo $?`" == "0" ]; then
+			QuestionGetString NO "Install OpenVPN ? " ToInstall_OpenVPN YES
+			if [ "$ToInstall_OpenVPN" == "YES" ]; then
+				OpenVPN_Proto=""
+				QuestionGetString NO  "OpenVPN port with redirect gateway (TUN): " Port_OpenVPN_WithGW 8893
+				QuestionGetString NO  "OpenVPN port without redirect gateway (TUN): " Port_OpenVPN_WithoutGW 8894
+				QuestionGetString NO  "OpenVPN port without redirect gateway (TAP): " Port_OpenVPN_TAP_WithoutGW 8895
+				while [ ! "$OpenVPN_Proto" = "UDP" ] && [ ! "$OpenVPN_Proto" = "TCP" ]; do
+					QuestionGetString NO "Which protocol (TCP is recommended), 'UDP' OR 'TCP' ? : " OpenVPN_Proto TCP
+				done
+			fi
+		else
+			echo -e "${CYELLOW}Your system is an$CEND ${CRED}OpenVZ container$CEND${CYELLOW}.$CEND"
+			echo -e "${CYELLOW}You must follow this link BEFORE install 'MySB'.$CEND"
+			echo -e "${CGREEN}https://openvpn.net/index.php/access-server/docs/admin-guides/186-how-to-run-access-server-on-a-vps-container.html$CEND"
+			ToInstall_OpenVPN=NO
+
+			QuestionGetString NO  "Do you want to continue MySB installation without OpenVPN, type 'yes' ?" CONTINUE NO
+			if [ "$CONTINUE" == "NO" ]; then
+				echo -e "${CYELLOW}OK, see you later...$CEND"
+				echo
+				echo
+				EndingScript 0 $MySB_Install_PID
+			fi
+		fi
+	fi
+fi
+
+#### SECURITY
+if [ "$DisplaySecurity" == "YES" ]; then
+	if [ "$DisplayInfo" == "YES" ]; then
+		echo
+		echo -e "${CYELLOW}#### Security ####$CEND"
+	fi
+
+	# Logwatch
+	if [ "$IsInstalled_LogWatch" != "YES" ]; then
+		QuestionGetString NO "Install Logwatch ?" ToInstall_LogWatch YES
+	fi
+
+	# Fail2Ban
+	if [ "$IsInstalled_Fail2Ban" != "YES" ]; then
+		echo
+		QuestionGetString NO "Install Fail2ban ? " ToInstall_Fail2Ban YES
+	fi
+
+	# Blocklist
+	if [ "$MySB_PeerBlock" == "none" ] || [ "$MySB_PeerBlock" == "" ]; then
+		echo
+		echo -e "${CYELLOW}How should we manage blocklists ?$CEND"
+		echo -e "${CYELLOW}With$CEND ${CGREEN}PeerGuardian$CEND${CYELLOW}, you completely protect your seedbox. You also use less RAM. $CEND"
+		echo -e "${CYELLOW}While with$CEND ${CGREEN}rTorrent$CEND${CYELLOW}, you will only protect your use of rTorrent. And memory consumption will be dependent on the number of seedbox users.$CEND"
+		echo -e "${CYELLOW}Choose '$CEND${CGREEN}none$CEND${CYELLOW}' if you don't want to use a blocklist. It's not recommended.$CEND"
+
+		if [ -z $IFPVEKERNEL ]; then
+			if [ "$MEMORY" -lt "2048" ]; then
+				echo -e "${CYELLOW}Your system have ${CRED}$MEMORY$CEND ${CYELLOW}MB of RAM. I recommend using PeerGuardian.$CEND"
+			else
+				echo -e "${CYELLOW}Your system have ${CRED}$MEMORY$CEND ${CYELLOW}MB of RAM. You can choose between PeerGuardian and rTorrent.$CEND"
+			fi
+			QuestionGetString NO "'PeerGuardian' OR 'rTorrent' OR 'none' ?" MySB_PeerBlock "PeerGuardian"
+		else
+			echo -e "${CYELLOW}Your system is an$CEND ${CRED}OpenVZ container$CEND${CYELLOW}.$CEND"
+			echo -e "${CYELLOW}It's not possible to install$CEND ${CGREEN}PeerGuardian$CEND${CYELLOW}.$CEND"
+			QuestionGetString NO "'rTorrent' OR 'none' ?" MySB_PeerBlock "rTorrent"
+		fi
+	fi
+
+	# DNScrypt-proxy
+	if [ "$IsInstalled_DNScrypt" != "YES" ]; then
+		echo
+		QuestionGetString NO "Install DNScrypt-proxy (recommended) ? " ToInstall_DNScrypt YES
+		if [ ! -z $IFPVEKERNEL ] && [ "$ToInstall_DNScrypt" == "YES" ]; then
+			echo -e "${CYELLOW}Your system is an$CEND ${CRED}OpenVZ container$CEND${CYELLOW}.$CEND"
+			echo -e "${CYELLOW}At the end of the installation, you should replace your DNS (/etc/resolv.conf) with ${CGREEN}nameserver 127.0.0.1$CEND${CYELLOW} through the OpenVZ host (eg Proxmox).$CEND"
+			echo -e "${CYELLOW}Otherwise you will lose your configuration on the next reboot.$CEND"
+			sleep 10
+		fi
+	fi
+fi
+
+#### Add answer to SQLite db
+if [ "$TYPE" == "INSTALL" ]; then
+	# 'system' table
+	if [ "$IpRestriction" == "YES" ]; then
+		IpRestriction="1"
+	else
+		IpRestriction="0"
+	fi	
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE system SET hostname = '$HostNameFQDN', ipv4 = '$SrvIpAddress', primary_inet = '$PrimaryInet', timezone = '$TimeZone', server_provider = '$ServerProvider', ip_restriction = '$IpRestriction' WHERE id_system = '1';"
+	
+	# 'smtp' table
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE smtp SET smtp_provider = '$SMTP_Provider', smtp_username = '$SMTP_Username', smtp_passwd = '$SMTP_Password', smtp_email ='$MainUserEmail' WHERE id_smtp = '1';"
+
+	# 'users' table (Main user)
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "INSERT into users (users_ident,users_email,users_passwd,sftp,sudo,admin) VALUES (\"$NEWUSER\",\"$MainUserEmail\",\"$PASSWORD\",\"1\",\"1\",\"1\");"
+	sqlite3 -cmd '.timeout 150000' $Wolf_DB "UPDATE user SET name = '$NEWUSER', email = '$MainUserEmail', username = '$NEWUSER' WHERE id = '2';"
+
+	# 'users_addresses' table
+	MainUserId=$(sqlite3 -cmd '.timeout 150000' $MySB_DB "SELECT id_users FROM users WHERE users_ident = '$NEWUSER'")	
+	IFS=$','
+	for ip in $MainUserIPs; do
+		HostName="$(nslookup $ip | grep 'name =' | awk '{ print $4 }' | sed 's/.\{1\}$//g')"
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "INSERT into users_addresses (id_users,ipv4,hostname,check_by,is_active) VALUES (\"$MainUserId\",\"$ip\",\"$HostName\",\"ipv4\",\"1\");"
+	done
+	unset IFS	
+	
+	#### 'services' table
+	# HTTPs & HTTP
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET port_tcp1 = '$Port_HTTPS', port_tcp2 = '$Port_HTTP', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'NginX';"
+	# SSH
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET port_tcp1 = '$Port_SSH', port_tcp2 = '', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'SSH';"
+	# FTP
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET port_tcp1 = '$Port_FTP', port_tcp2 = '$Port_FTP_Data', port_tcp3 = '65000:65535', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'VSFTPd';"
+fi
+
+if [ "$ToInstall_Manager" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'Seedbox-Manager';"
+fi
+
+if [ "$ToInstall_Cakebox" == "YES" ]; then
+	#sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1', port_tcp1 = '$Ports_Cakebox', port_tcp2 = '', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'CakeBox-Light';"
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1', port_tcp1 = '', port_tcp2 = '', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'CakeBox-Light';"
+fi
+
+if [ "$ToInstall_PlexMedia" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'Plex Media Server';"
+fi
+
+if [ "$ToInstall_Webmin" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1', port_tcp1 = '$Ports_Webmin', port_tcp2 = '', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'Webmin';"
+fi
+
+if [ "$ToInstall_OpenVPN" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'OpenVPN';"
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'Samba';"
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'NFS';"
+	OpenVPN_Proto=`echo $OpenVPN_Proto | tr '[:upper:]' '[:lower:]'`
+	case "$OpenVPN_Proto" in
+		"tcp")
+			sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1', port_tcp1 = '$Port_OpenVPN_WithGW', port_tcp2 = '$Port_OpenVPN_WithoutGW', port_tcp3 = '$Port_OpenVPN_TAP_WithoutGW', ports_tcp_list = '', port_udp1 = '', port_udp2 = '', port_udp3 = '', ports_udp_list = '' WHERE serv_name = 'OpenVPN';"
+		;;
+		"udp")
+			sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1', port_tcp1 = '', port_tcp2 = '', port_tcp3 = '', ports_tcp_list = '', port_udp1 = '$Port_OpenVPN_WithGW', port_udp2 = '$Port_OpenVPN_WithoutGW', port_udp3 = '$Port_OpenVPN_TAP_WithoutGW', ports_udp_list = '' WHERE serv_name = 'OpenVPN';"
+		;;
+	esac
+fi
+
+if [ "$ToInstall_LogWatch" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'LogWatch';"
+fi
+
+if [ "$ToInstall_Fail2Ban" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'Fail2Ban';"
+fi
+
+if [ "$ToInstall_DNScrypt" == "YES" ]; then
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'DNScrypt-proxy';"
+fi
+
+case "$MySB_PeerBlock" in
+	"PeerGuardian")
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'PeerGuardian';"
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '0' WHERE serv_name = 'rTorrent Block List';"
+	;;
+	"rTorrent")
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '0' WHERE serv_name = 'PeerGuardian';"
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '1' WHERE serv_name = 'rTorrent Block List';"
+	;;
+	*)
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '0' WHERE serv_name = 'PeerGuardian';"
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '0' WHERE serv_name = 'rTorrent Block List';"
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

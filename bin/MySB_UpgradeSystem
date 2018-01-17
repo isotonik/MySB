@@ -1,0 +1,119 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+PackagesManage upgrade
+
+#### VARs
+CertsDir="/etc/ssl/certs"
+GeoTrustDir="$MySB_InstallDir/ssl/GeoTrust"
+GoDaddyDir="$MySB_InstallDir/ssl/GoDaddy"
+
+#### Create dir
+if [ ! -d $GeoTrustDir ]; then mkdir $GeoTrustDir; fi
+if [ ! -d $GoDaddyDir ]; then mkdir $GoDaddyDir; fi
+
+#### GeoTrust
+cd $GeoTrustDir/
+
+# Root 1 - Equifax Secure Certificate Authority
+if [ ! -f $GeoTrustDir/Equifax_Secure_Certificate_Authority.pem ]; then
+	wget --no-check-certificate https://www.geotrust.com/resources/root_certificates/certificates/Equifax_Secure_Certificate_Authority.pem
+fi
+if [ -f $GeoTrustDir/Equifax_Secure_Certificate_Authority.pem ] && [ ! -h $CertsDir/Equifax_Secure_Certificate_Authority.pem ]; then
+	ln -s $GeoTrustDir/Equifax_Secure_Certificate_Authority.pem $CertsDir/Equifax_Secure_Certificate_Authority.pem
+fi
+
+# Root 2 - GeoTrust Global CA
+if [ ! -f $GeoTrustDir/GeoTrust_Global_CA.pem ]; then
+	wget --no-check-certificate https://www.geotrust.com/resources/root_certificates/certificates/GeoTrust_Global_CA.pem
+fi
+if [ -f $GeoTrustDir/GeoTrust_Global_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Global_CA.pem ]; then
+	ln -s $GeoTrustDir/GeoTrust_Global_CA.pem $CertsDir/GeoTrust_Global_CA.pem
+fi
+
+# Root 3 - GeoTrust Primary Certification Authority
+if [ ! -f $GeoTrustDir/GeoTrust_Primary_CA.pem ]; then
+	wget --no-check-certificate https://www.geotrust.com/resources/root_certificates/certificates/GeoTrust_Primary_CA.pem
+fi
+if [ -f $GeoTrustDir/GeoTrust_Primary_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Primary_CA.pem ]; then
+	ln -s $GeoTrustDir/GeoTrust_Primary_CA.pem $CertsDir/GeoTrust_Primary_CA.pem
+fi
+
+# Root 6 - GeoTrust Universal CA 
+if [ ! -f $GeoTrustDir/GeoTrust_Universal_CA.pem ]; then
+	wget --no-check-certificate https://www.geotrust.com/resources/root_certificates/certificates/GeoTrust_Universal_CA.pem
+fi
+if [ -f $GeoTrustDir/GeoTrust_Universal_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Universal_CA.pem ]; then
+	ln -s $GeoTrustDir/GeoTrust_Universal_CA.pem $CertsDir/GeoTrust_Universal_CA.pem
+fi
+
+# Root 8 - Equifax Secure Global eBusiness CA-1
+if [ ! -f $GeoTrustDir/Equifax_Secure_Global_eBusiness_CA-1.pem ]; then
+	wget --no-check-certificate https://www.geotrust.com/resources/root_certificates/certificates/Equifax_Secure_Global_eBusiness_CA-1.pem
+fi
+if [ -f $GeoTrustDir/Equifax_Secure_Global_eBusiness_CA-1.pem ] && [ ! -h $CertsDir/Equifax_Secure_Global_eBusiness_CA-1.pem ]; then
+	ln -s $GeoTrustDir/Equifax_Secure_Global_eBusiness_CA-1.pem $CertsDir/Equifax_Secure_Global_eBusiness_CA-1.pem
+fi
+
+#### GoDaddy
+cd $GoDaddyDir/
+
+# intermediate
+if [ ! -f $GoDaddyDir/gd_intermediate.crt ]; then
+	wget --no-check-certificate https://certs.godaddy.com/repository/gd_intermediate.crt
+fi
+if [ -f $GoDaddyDir/gd_intermediate.crt ] && [ ! -h $CertsDir/gd_intermediate.pem ]; then
+	ln -s $GoDaddyDir/gd_intermediate.crt $CertsDir/gd_intermediate.pem
+fi
+
+# cross_intermediate
+if [ ! -f $GoDaddyDir/gd_cross_intermediate.crt ]; then
+	wget --no-check-certificate https://certs.godaddy.com/repository/gd_cross_intermediate.crt
+fi
+if [ -f $GoDaddyDir/gd_cross_intermediate.crt ] && [ ! -h $CertsDir/gd_cross_intermediate.pem ]; then
+	ln -s $GoDaddyDir/gd_cross_intermediate.crt $CertsDir/gd_cross_intermediate.pem
+fi
+
+#### Disable some init, they will start by MySB_SecurityRules
+if [ -f /etc/init.d/fail2ban ]; then
+	update-rc.d fail2ban remove -f &> /dev/null 2>&1
+fi
+if [ -f /etc/init.d/bind9 ]; then
+	update-rc.d bind9 remove -f &> /dev/null
+fi
+if [ -f /etc/init.d/dnscrypt-proxy ]; then
+	update-rc.d dnscrypt-proxy remove -f &> /dev/null
+fi
+if [ -f /etc/init.d/pgl ]; then
+	update-rc.d pgl remove -f &> /dev/null
+fi
+
+update-ca-certificates --verbose --fresh
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
