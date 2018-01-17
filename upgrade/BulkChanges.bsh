@@ -1,0 +1,154 @@
+#!/bin/bash
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_before
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+case "$1" in
+	"BEFORE")
+		####################################
+		#### To call for every upgrade - BoF
+		# Get new vars after MySQL.bsh script
+		source $MySB_InstallDir/inc/vars
+
+		# Create missing directories and change rights
+		gfnManageDirAndFiles 'global'
+
+		# Switching DNS
+		gfnSwitchDNS "bind"
+
+		# Forcing NTP update
+		ping -c4 0.fr.pool.ntp.org
+		/usr/sbin/ntpdate -u 0.fr.pool.ntp.org
+
+		# MySQL
+		if [ -f /tmp/MySQL.bsh.log ]; then
+			cat /tmp/MySQL.bsh.log >> $MySB_InstallDir/logs/BulkChanges.bsh.log
+		fi
+
+		# VARs & Functions
+		if [ -z $funcs_Install ]; then
+			source $MySB_InstallDir/inc/funcs_by_script/funcs_Install
+		fi
+		if [ -z $funcs_SourcesList ]; then
+			source $MySB_InstallDir/inc/funcs_by_script/funcs_SourcesList
+		fi
+
+		# Remove old banners
+		rm -fv $MySB_InstallDir/files/banner_*
+		#### To call for every upgrade - EoF
+		####################################
+
+		#### APT-Mirror
+		echo "0 7 * * * root /usr/bin/apt-mirror $MySB_InstallDir/files/apt_mirrors/mirror.list > /var/spool/apt-mirror/var/cron.log" > /etc/cron.d/apt-mirror
+
+		#### Watchdog rTorrent services
+		gfnListCountUsers 'normal'
+		crontab -l > /tmp/crontab.tmp
+		for seedUser in $gsUsersList; do
+			sed -i '/'$seedUser'/d' /tmp/crontab.tmp
+			echo "*/5 * * * * if ! ( /bin/ps -U $seedUser | grep 'rtorrent' > /dev/null ); then service rtorrent-$seedUser restart > /dev/null 2>&1; fi" | tee -a /tmp/crontab.tmp
+		done
+		crontab /tmp/crontab.tmp
+		rm -f /tmp/crontab.tmp
+
+		#### Wheezy to Jessie upgrade
+		gfnPackagesManage purge "update-notifier-common python3.2 gnupg-curl libav-tools libhttp-daemon-ssl-perl aptitude php-pear plexmediaserver"
+		cmdMySQL 'MySB_db' "UPDATE system SET apt_update = 1, apt_date = '`date +%Y-%m-%d\ %H:%M:%S`' WHERE id_system='1';" -v
+		gfnPackagesManage 'upgrade'
+		gfnPackagesManage 'dist-upgrade'
+		[ -f /etc/apt/sources.list.d/git-lfs.list ] && rm -vf /etc/apt/sources.list.d/git-lfs.list
+		[ -f /etc/init.d/plexmediaserver ] && rm -vf /etc/init.d/plexmediaserver
+		[ -d $MySB_InstallDir/files/apt_mirrors/mirrors/packagecloud.io ] && rm -vrf $MySB_InstallDir/files/apt_mirrors/mirrors/packagecloud.io
+		[ -d $MySB_InstallDir/files/apt_mirrors/mirrors/moblock-deb.sourceforge.net ] && rm -vrf $MySB_InstallDir/files/apt_mirrors/mirrors/moblock-deb.sourceforge.net
+		[ -d $MySB_InstallDir/files/apt_mirrors/mirrors/shell.ninthgate.se ] && rm -vrf $MySB_InstallDir/files/apt_mirrors/mirrors/shell.ninthgate.se
+		apt-get autoclean -y
+		apt-get autoremove -y
+	;;
+	"AFTER")
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		gfnManageDirAndFiles 'global'
+
+		# STOP & START services
+		gfnManageServices stop "ntp stunnel4 postfix"
+		gfnManageServices start "ntp stunnel4 postfix samba nginx dnscrypt-proxy webmin"
+
+		# Update version info
+		cmdMySQL 'MySB_db' "UPDATE system SET mysb_version = '$gsCurrentVersion' WHERE id_system='1';" -v
+		figlet MySB $gsCurrentVersion > /etc/motd
+		echo >> /etc/motd
+
+		# Send mail for each user with new version
+		source $MySB_InstallDir/inc/vars
+		source $MySB_InstallDir/inc/funcs_by_script/funcs_MySB_CreateUser
+		gfnListCountUsers 'normal'
+		gsRutorrentDirEscaped="`echo $gsRutorrentDir | sed s,/,\\\\\\\\\\/,g`"
+		for seedUser in $gsUsersList; do
+			sRequestValues="`cmdMySQL 'MySB_db' "SELECT id_users,users_passwd FROM users WHERE users_ident = '$seedUser';" | sed 's/\t/|/g;'`"
+			UserId="`echo $sRequestValues | awk '{split($0,a,"|"); print a[1]}'`"
+			UserPassword="`echo $sRequestValues | awk '{split($0,a,"|"); print a[2]}'`"
+			install -v -o root -g root -m 0755 $MySB_InstallDir/templates/init/etc.init.d.rtorrent.tmpl /etc/init.d/rtorrent-$seedUser
+			perl -pi -e "s/<username>/$seedUser/g" /etc/init.d/rtorrent-$seedUser
+			gfnCreateRtorrentConfigFile "$seedUser" 'force'
+
+			if [ "$UserId" == "$gnMainUserId" ] && [ ! -z "$UserPassword" ]; then
+				# Remove main user password from database
+				cmdMySQL 'MySB_db' "UPDATE users SET users_passwd = '' WHERE admin = '1';" -v
+				gfnScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_ChangeUserPassword" "$seedUser" "$UserPassword" 'UPGRADE'
+			else
+				# Init password required
+				cmdMySQL 'MySB_db' "UPDATE users SET init_password = '1' WHERE users_ident = '$seedUser';" -v
+				Subject="$Upgrade_SubjectUpgraded $gsCurrentVersion"
+				gfnSendMail "$Subject" "$seedUser" "upgrade"
+			fi
+		done
+		#### To call for every upgrade - EoF
+		####################################
+
+		# Cleaning
+		if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -vf /etc/init.d/plexmediaserver.dpkg-bak; fi
+		if [ -f /etc/samba/smb.conf.ucf-dist ]; then rm -vf /etc/samba/smb.conf.ucf-dist; fi
+		if [ -f /etc/logrotate.d/fail2ban.dpkg-dist ]; then rm -vf /etc/logrotate.d/fail2ban.dpkg-dist; fi
+		if [ -f /etc/logrotate.d/samba.dpkg-dist ]; then rm -vf /etc/logrotate.d/samba.dpkg-dist; fi
+		if [ -f /etc/vim/vimrc.dpkg-dist ]; then rm -vf /etc/vim/vimrc.dpkg-dist; fi
+		if [ -f /etc/default/stunnel4.dpkg-dist ]; then rm -vf /etc/default/stunnel4.dpkg-dist; fi
+		if [ -f /etc/init.d/nfs-kernel-server.dpkg-dist ]; then rm -vf /etc/init.d/nfs-kernel-server.dpkg-dist; fi
+		if [ -f /etc/init.d/bind9.dpkg-dist ]; then rm -vf /etc/init.d/bind9.dpkg-dist; fi
+		if [ -f /etc/vsftpd.conf.dpkg-dist ]; then rm -vf /etc/vsftpd.conf.dpkg-dist; fi
+		if [ -f /etc/fail2ban/fail2ban.conf.dpkg-dist ]; then rm -vf /etc/fail2ban/fail2ban.conf.dpkg-dist; fi
+		rm -v /etc/fail2ban/action.d/*.dpkg-dist
+
+		#### Apply quota for users
+		gfnManageQuota '-v'
+
+		#### Check actuel quota
+		repquota -a
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
