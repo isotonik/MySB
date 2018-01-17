@@ -1,0 +1,240 @@
+#!/bin/bash
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_before
+# -----------------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+case "$1" in
+	"BEFORE")
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		ManageDirectoriesAndFiles 'global'
+
+		# Switching DNS
+		SwitchDNS "bind"
+
+		# Forcing NTP update
+		ping -c4 0.fr.pool.ntp.org
+		/usr/sbin/ntpdate -u 0.fr.pool.ntp.org
+
+		# MySQL
+		if [ -f /tmp/MySQL.bsh.log ]; then
+			cat /tmp/MySQL.bsh.log >> $MySB_InstallDir/logs/BulkChanges.bsh.log
+		fi
+
+		# VARs & Functions
+		if [ -z $funcs_Install ]; then
+			source $MySB_InstallDir/inc/funcs_by_script/funcs_Install
+		fi
+		ListCountUsers
+		#### To call for every upgrade - EoF
+		####################################
+
+		#### SSH
+		cp -v $MySB_InstallDir/templates/etc.ssh.sshd_config.tmpl /etc/ssh/sshd_config
+		perl -pi -e "s/<port_ssh>/$Port_SSH/g" /etc/ssh/sshd_config
+		if [ -f /etc/ssh/sshd_config.orig ]; then
+			rm -vf /etc/ssh/sshd_config.orig
+		fi
+		figlet MySB $MySB_CurrentVersion > /etc/motd
+		echo >> /etc/motd
+		cat /etc/motd
+
+		#### Nginx v1.10.2 DotDeb
+		if [ -f $MySB_InstallDir/files/repos_keys/dotdeb_php56.list ]; then
+			cat $MySB_InstallDir/files/repos_keys/dotdeb_php56.list >> $MySB_InstallDir/files/repos_keys/dotdeb.list
+			rm -f $MySB_InstallDir/files/repos_keys/dotdeb_php56.list
+		fi
+		if [ ! -z "`apt-key list | grep '7BD9BF62'`" ]; then
+			apt-key adv --keyserver keys.gnupg.net --recv-keys 7BD9BF62
+		fi
+		ManageServices stop "nginx"
+		killall -9 nginx
+		rm -f /var/run/nginx.pid
+
+		#### APT-Mirror Cron
+		sed -i "s/^#0 4/0 4/g;" /etc/cron.d/apt-mirror
+
+		#### Remove all tracker certificate
+		rm -vf $MySB_InstallDir/ssl/trackers/*.pem
+
+		#### RSysLog
+		if [ -f /etc/rsyslog.d/iptables.conf ]; then rm -vf /etc/rsyslog.d/iptables.conf; fi
+		echo "if (\$msg contains '[MySB] ' or \$msg contains 'IN=') then /var/log/iptables.log" | tee -a /etc/rsyslog.d/iptables.conf
+		echo "& ~" | tee -a /etc/rsyslog.d/iptables.conf
+		LogRotate 'iptables'
+		ManageServices stop "rsyslog"
+
+		#### Create init script for MySB_SecurityRules_Init
+		install -g root -o root -m 0755 $MySB_InstallDir/templates/init/etc.init.MySB_SecurityRules_Init.tmpl /etc/init.d/MySB_SecurityRules_Init
+		update-rc.d MySB_SecurityRules_Init defaults
+
+		#### ownCloud
+		if [ -d $MySB_InstallDir/web/owncloud ]; then
+			mv -v $MySB_InstallDir/web/owncloud $MySB_InstallDir/web/apps/oc
+		fi
+
+		#### Cakebox
+		if [ -d $MySB_InstallDir/web/cakebox-light ]; then
+			mv -v $MySB_InstallDir/web/cakebox-light $MySB_InstallDir/web/apps/cb
+		fi
+
+		#### LoadAvg
+		if [ -d $MySB_InstallDir/web/loadavg ]; then
+			mv -v $MySB_InstallDir/web/loadavg $MySB_InstallDir/web/apps/la
+		fi
+
+		#### ruTorrent
+		if [ -d $MySB_InstallDir/web/rutorrent ]; then
+			mv -v $MySB_InstallDir/web/rutorrent $MySB_InstallDir/web/apps/ru
+		fi
+
+		#### Seedbox-Manager
+		if [ -d $MySB_InstallDir/web/seedbox-manager ]; then
+			mv -v $MySB_InstallDir/web/seedbox-manager $MySB_InstallDir/web/apps/sm
+		fi
+
+		#### TMPFS
+		ManageServices stop 'nginx php5-fpm mysql'
+		# PHP
+		sed -i '/PHP TMPFS/d' /etc/fstab
+		sed -i '/\/var\/lib\/php5\/sessions/d' /etc/fstab
+		echo "# TMPFS - PHP" >> /etc/fstab
+		echo "tmpfs   /mnt/tmpFS/php tmpfs defaults,nosuid,noatime,mode=1777,size=32M 0 0" >> /etc/fstab
+		# MySQL
+		sed -i '/MySQL/d' /etc/fstab
+		echo "# TMPFS - MySQL" >> /etc/fstab
+		echo "tmpfs   /mnt/tmpFS/mysql      tmpfs   defaults,nosuid,noatime,mode=1777,size=32M 0 0" >> /etc/fstab
+		# NginX PageSpeed
+		sed -i '/Nginx PageSpeed/d' /etc/fstab
+		echo "# TMPFS - Nginx PageSpeed" >> /etc/fstab
+		echo "tmpfs   /mnt/tmpFS/pagespeed      tmpfs   defaults,nosuid,noatime,mode=1777,size=32M 0 0" >> /etc/fstab
+
+		#### Bash
+		if [ ! -f /root/.bash_profile ]; then rm -vf /root/.bash_profile; fi
+		if [ ! -f /root/.bash_profile ]; then
+			(
+			cat <<'EOF'
+if [ -f /etc/bash_completion ]; then
+	. /etc/bash_completion
+fi
+if [ -f "$HOME/.bashrc" ]; then
+	. "$HOME/.bashrc"
+fi
+
+EOF
+			) | tee -a /root/.bash_profile
+		fi
+	;;
+	"AFTER")
+		####################################
+		#### To call for every upgrade - BoF
+		# Create missing directories and change rights
+		ManageDirectoriesAndFiles 'global'
+
+		# STOP & START services
+		ManageServices stop "ntp stunnel4 postfix"
+		ManageServices start "ntp stunnel4 postfix samba nginx dnscrypt-proxy webmin"
+
+		# Update version info
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "mysb_version = '$MySB_CurrentVersion'" "id_system = '1'" '-echo'
+		figlet MySB $MySB_CurrentVersion > /etc/motd
+		echo >> /etc/motd
+
+		# Send mail for each user with new version
+		ListCountUsers
+		source $MySB_InstallDir/inc/vars
+		source $MySB_InstallDir/inc/funcs_by_script/funcs_MySB_CreateUser
+		MainUserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "admin = '1'"`"
+		RutorrentDirEscaped="`echo $RutorrentDir | sed s,/,\\\\\\\\\\/,g`"
+		for seedUser in $UsersList; do
+			########## ONLY USED FOR v3.5 UPGRADE, TO DELETE ON NEXT VERSION - BoF ##########
+			# Adding the user creation date
+			# A MySQL trigger will create entries into the tables 'users_history'.
+			# This entries are needed to process to a renting management.
+			CreationDate="`date -r /home/$seedUser/rtorrent '+%Y-%m-%d'`"
+			########## ONLY USED FOR v3.5 UPGRADE, TO DELETE ON NEXT VERSION - EoF ##########
+
+			UserId="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_users' 'users' "users_ident = '$seedUser'"`"
+			UserPassword="`Func_SQL_Command 'SELECT' 'MySB_db' 'users_passwd' 'users' "users_ident = '$seedUser'"`"
+			install -g root -o root -m 0755 $MySB_InstallDir/templates/init/etc.init.rtorrent.tmpl /etc/init.d/rtorrent-$seedUser
+			perl -pi -e "s/<username>/$seedUser/g" /etc/init.d/rtorrent-$seedUser
+			CreateRtorrentConfigFile "$seedUser" 'force'
+
+			if [ "$UserId" == "$MainUserId" ] && [ ! -z "$UserPassword" ]; then
+				# Remove main user password from database
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "created_at = '$CreationDate', users_passwd = ''" "admin = '1'" '-echo'
+				ScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_ChangeUserPassword" "$seedUser" "$UserPassword" 'UPGRADE'
+			else
+				# Init password required
+				Func_SQL_Command 'UPDATE' 'MySB_db' 'users' "created_at = '$CreationDate', init_password = '1'" "users_ident = '$seedUser'" '-echo'
+				Subject="$Upgrade_SubjectUpgraded $MySB_CurrentVersion"
+				SendMail "$Subject" "$seedUser" "upgrade"
+			fi
+		done
+		#### To call for every upgrade - EoF
+		####################################
+
+		# IF renting management is active SO we add tracking rent history for each users.
+		RentingValues="`Func_SQL_Command 'SELECT' 'MySB_db' 'model,tva,global_cost,nb_users,price_per_users,method' 'renting' "id_renting = '1'"`"
+		RentingModel="`echo $RentingValues | awk '{split($0,a,"|"); print a[1]}'`"
+		RentingTVA="`echo $RentingValues | awk '{split($0,a,"|"); print a[2]}'`"
+		RentingGlobalCost="`echo $RentingValues | awk '{split($0,a,"|"); print a[3]}'`"
+		NbUser="`echo $RentingValues | awk '{split($0,a,"|"); print a[4]}'`"
+		PriceByUser="`echo $RentingValues | awk '{split($0,a,"|"); print a[5]}'`"
+		Method="`echo $RentingValues | awk '{split($0,a,"|"); print a[6]}'`"
+		export LANG=""
+		AmountOfTax=`echo "($RentingGlobalCost*$RentingTVA)/100" | bc -l`
+		RentingCostTva=`echo "$RentingGlobalCost+$AmountOfTax" | bc -l`
+		RentingCostTva=`printf '%.2f\n' $RentingCostTva`
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "rt_model = '$RentingModel', rt_tva = '$RentingTVA', rt_global_cost = '$RentingGlobalCost', rt_cost_tva = '$RentingCostTva', rt_nb_users = '$NbUser', rt_price_per_users = '$PriceByUser', rt_method = '1'" "id_system = '1'" '-echo'
+		# Now, we can drop old renting table
+		Func_SQL_Command 'DROP' 'MySB_db' 'renting' '-echo'
+		# Creating entries for tracking rent history for all users since last user creation.
+		MonthlyPayment "UPGRADE"
+
+		# Cleaning
+		rm -vf $MySB_InstallDir/db/*.sql
+		if [ -d /var/log/dnscrypt-proxy ]; then rm -rfv /var/log/dnscrypt-proxy; fi
+		if [ -f /etc/logrotate.d/nginx.dpkg-dist ]; then rm -vf /etc/logrotate.d/nginx.dpkg-dist; fi
+		if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -vf /etc/init.d/plexmediaserver.dpkg-bak; fi
+		for seedUser in $UsersList; do
+			rm -v /home/$seedUser/logs/*
+		done
+		# Delete old MySB's backups files
+		rm -vf ${MySB_InstallDir}_backup/Backup-*-v1.*.tar.gz
+		rm -vf ${MySB_InstallDir}_backup/Backup-*-v2.*.tar.gz
+
+		#### Apply quota for users
+		ManageQuota
+
+		#### Check actuel quota
+		repquota -a
+	;;
+esac
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
