@@ -1,0 +1,145 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### VARs
+Type="$1"
+
+#### Updating clock
+echo -e -n "${CBLUE}Updating the clock$CEND..."
+ping -c4 0.fr.pool.ntp.org > /dev/null 2>&1
+if [ $? -gt 0 ]; then
+	SwitchDNS "standard"
+fi
+/usr/sbin/ntpdate -u 0.fr.pool.ntp.org > /dev/null 2>&1
+echo -e "${CGREEN}Done !$CEND"
+
+#### Update actual repo
+echo -e -n "${CBLUE}Updating actual GitHub repository$CEND..."
+screen -dmS MySB_GitHubRepoUpdate /bin/bash $MySB_InstallDir/bin/MySB_GitHubRepoUpdate 'REFRESH';
+WaitingScreen MySB_GitHubRepoUpdate
+StatusSTD
+
+#### Check if new version
+MySB_NewVersion="`cat $MySB_InstallDir/version`"
+
+if [ "$MySB_CurrentVersion" == "$MySB_NewVersion" ]; then
+	echo
+	echo -e "${CGREEN}MySB repository $MySB_CurrentVersion is up to date !$CEND"
+	echo -e "${CGREEN}There is no new version to install.$CEND"
+	echo
+	EndingScript 0
+else
+	case "$Type" in
+		"CRON")
+			SendMail "MySB - New version available ($MySB_NewVersion)" "$MainUser" "new_version" "New version available"
+			
+			EndingScript 0
+		;;	
+		*)
+			echo
+			echo -e "${CYELLOW}MySB$CEND ${CGREEN}$MySB_NewVersion$CEND ${CYELLOW}is avaible !$CEND"
+			echo -e "${CYELLOW}Do you want to continue and upgrade MySB to $CEND${CGREEN}$MySB_NewVersion$CEND ${CYELLOW}?$CEND"
+			echo
+			QuestionGetString NO  "Type 'yes' to continue or 'no' to abort ?" CONTINUE NO
+			if [ "$CONTINUE" == "NO" ]; then
+				EndingScript 0
+			fi
+		;;
+	esac
+fi
+
+#### Backup
+DateTime="`/bin/date +%Y%m%d-%H%M%S`"
+echo -e "${CBLUE}Create backup files '$MySB_InstallDir/upgrade/backup/Backup-$DateTime-$MySB_CurrentVersion.tar.gz'$CEND"
+echo -e -n "${CRED}Please wait $CEND"
+CountDown 5
+
+if [ ! -d $MySB_InstallDir/upgrade/backup ]; then
+	mkdir -p $MySB_InstallDir/upgrade/backup
+fi
+mv -v $MySB_InstallDir/upgrade/backup /tmp/MySB_backup_$DateTime
+tar -zcvf /tmp/MySB_backup_$DateTime/Backup-$DateTime-$MySB_CurrentVersion.tar.gz $MySB_InstallDir
+mv -v /tmp/MySB_backup_* $MySB_InstallDir/upgrade/backup
+
+#### MySB Script GitHub
+echo
+echo -e "${CBLUE}Merge MySB to $MySB_NewVersion$CEND"
+echo -e -n "${CRED}Please wait $CEND"
+CountDown 5
+
+cd $MySB_InstallDir/
+git fetch --all
+git stash
+git checkout -b $MySB_NewVersion origin/$MySB_NewVersion
+git pull
+
+#### Update version info
+echo -e -n "${CBLUE}Updating MySB version$CEND..."
+sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE system SET mysb_version = '$MySB_NewVersion' WHERE id_system = '1';"
+rm -f $MySB_InstallDir/files/banner_*
+echo -e "${CGREEN}Done !$CEND"
+
+#### Completing the upgrade
+if [ -f $MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh ]; then
+	#### Upgrade System
+	echo -e -n "${CBLUE}Upgrading the system$CEND..."
+	screen -dmS MySB_UpgradeSystem /bin/bash $MySB_InstallDir/bin/MySB_UpgradeSystem 'UPGRADE';
+	WaitingScreen MySB_UpgradeSystem
+	StatusSTD	
+	
+	echo
+	echo -e "${CBLUE}Starting SCREEN session...$CEND"
+	screen -wipe &> /dev/null
+	screen -dmS MySB_Upgrade /bin/bash $MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh;
+	echo -e -n "${CRED}Please wait $CEND"
+	CountDown 5
+	
+	screen -r MySB_Upgrade
+else
+	echo ""
+	echo ""
+	echo -e "${CRED}Upgrade script does not exist ($MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh), aborting...$CEND"	
+	EndingScript 0
+fi
+
+#### Statistics
+# No credentials are retained !
+# The server IP is only used to know the country of the SeedBox.
+if [ -f /etc/machine-id ] && [ ! -f $MySB_InstallDir/statistics ]; then
+	gsMachineId="`cat /etc/machine-id`"
+	[ ! -z "$gsMachineId" ] && gsResult="`curl --silent --retry 2 -A 'MySB' --data "version=$MySB_CurrentVersion&machine_id=$gsMachineId" http://mysb.is-by.us/statistics/`"
+	[ ! -z "`echo $gsResult | grep 'Statistics updated at'`" ] && echo "$gsResult" > $MySB_InstallDir/statistics
+fi
+
+#### Finished
+clear
+echo -e "${CGREEN}Upgrade finished succesfully !$CEND"
+echo
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

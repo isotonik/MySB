@@ -1,0 +1,342 @@
+#!/bin/bash
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+### BEGIN INIT INFO
+# Provides:          dnscrypt
+# Required-Start:    $remote_fs $network
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start DNScrypt-proxy
+# Description:       Encrypt DNS queries.
+### END INIT INFO
+
+#### Includes
+source /etc/MySB/config
+source $MySB_InstallDir/inc/vars
+source $MySB_InstallDir/inc/funcs
+source /lib/lsb/init-functions
+
+#### VARs
+NAME="dnscrypt-proxy"
+DESC="OpenDNS DNScrypt-proxy"
+DIR_PID="/var/run/dnscrypt-proxy"
+DIR_LOG="/var/log/dnscrypt-proxy"
+LOG_FILE="$DIR_LOG/dnscrypt-proxy.log"
+DAEMON_USER="dnscrypt"
+DAEMON="/usr/local/sbin/dnscrypt-proxy"
+CSV_FILE="/usr/local/share/dnscrypt-proxy/dnscrypt-resolvers.csv"
+IFPVEKERNEL="`uname -r | grep pve`"
+
+#### Command line arguments - Begin
+# Cherck arguments, we can start with as much DNScrypt resolver as desired (no IPv6).
+# The default resolvers are those accepting DNSsec and NoLogs.
+# --dnnsec
+# --nologs
+# --all (with or without DNSsec and NoLogs)
+# --resolver="rsolver1,resolver2,..."
+GivenResolvers=""
+ResolversSearched=""
+DNSsec="yes"
+NoLogs="yes"
+All=""
+
+if [ $# -gt 1 ]; then
+	for Arg in "$@"; do
+		case "$Arg" in
+			--all)
+				All="WHERE 1"
+			;;
+			--dnssec)
+				DNSsec="`echo $Arg | cut -d '=' -f 2 | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+				DNSsec="$DNSsec"
+			;;
+			--nologs)
+				NoLogs="`echo $Arg | cut -d '=' -f 2 | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+				NoLogs="$NoLogs"
+			;;
+			--resolver*)
+				echo $Arg
+				GivenResolvers="`echo $Arg | cut -d '=' -f 2 | sed -e 's/,/ /g;' | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+				for Resolver in $GivenResolvers; do
+					IfExist="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT id_dnscrypt_resolvers FROM dnscrypt_resolvers WHERE name = '$Resolver'\"`"
+					if [ ! -z "$IfExist" ]; then
+						ResolversSearched="$ResolversSearched AND name = '$Resolver'"
+					fi
+				done
+			;;
+		esac
+	done
+	
+	if [ -z "$All" ]; then
+		Search="WHERE dnssec = '$DNSsec' AND no_logs = '$NoLogs' $ResolversSearched"
+	else
+		Search="$All"
+	fi
+
+	# Get resolvers list (by command line)
+	AllResolvers="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT name FROM dnscrypt_resolvers $Search\"`"	
+else
+	# Get resolvers list (by database)
+	AllResolvers="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT name FROM dnscrypt_resolvers WHERE is_wished = '1'\"`"	
+fi
+
+# Cleaning the list (no IPv6)
+for Resolver in $AllResolvers; do
+	if [ -z "`echo $Resolver | grep 'ipv6'`" ]; then
+		ResolversList="${ResolversList} ${Resolver}"	
+	fi
+done
+ResolversList="`echo $ResolversList | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+
+# If resolvers list is empty
+if [ -z "$ResolversList" ]; then
+	ResolversList="dnscrypt.eu-dk dnscrypt.eu-nl"
+fi
+#### Command line arguments - End
+
+#### Check directories
+if [ ! -d $DIR_PID ]; then mkdir $DIR_PID && chown $DAEMON_USER:$DAEMON_USER $DIR_PID; fi
+if [ ! -d $DIR_LOG ]; then mkdir $DIR_LOG && chown $DAEMON_USER:$DAEMON_USER $DIR_LOG; fi
+
+#### Functions - Begin
+# Create daemon option
+DeamonOption() {
+	Name="$1"
+	LocalAddress="$2"
+	ProviderAddress="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT resolver_address FROM dnscrypt_resolvers WHERE name = '$Name'\"`"
+	ProviderName="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT provider_name FROM dnscrypt_resolvers WHERE name = '$Name'\"`"
+	ProviderKey="`sqlite3 -cmd '.timeout 150000' $MySB_DB \"SELECT provider_public_key FROM dnscrypt_resolvers WHERE name = '$Name'\"`"
+
+	DEAMON_OPT="--user=$DAEMON_USER --edns-payload-size=4096 --resolver-address=$ProviderAddress --provider-name=$ProviderName --provider-key=$ProviderKey --logfile=$DIR_LOG/$Resolver.log --local-address=$LocalAddress"
+}
+
+# Function that check BIND status
+bind_check() {
+	service bind9 stop &> /dev/null
+	service bind9 start &> /dev/null
+}
+
+# Function that check /etc/resolv.conf
+resolv_check() {
+	if [ -z "`cat /etc/resolv.conf | grep '127.0.0.1'`" ]; then
+		sed -i '/nameserver/d' /etc/resolv.conf
+		echo "nameserver 127.0.0.1" >> /etc/resolv.conf
+	fi
+}
+
+# Delete all pid files
+delete_pid_file() {
+	FnPid=$1
+	FnResolver="$2"
+
+    if [ -e $FnPid ]; then
+        rm -f $FnPid
+		echo "--> PID: $FnPid file deleted : "`date` >> $LOG_FILE
+    fi
+}
+
+# Function START
+do_start() {
+	resolv_check
+	bind_check
+
+	# Update DB
+	sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE dnscrypt_resolvers SET is_activated = '0', is_wished = '0' WHERE 1;"
+	
+	i=0
+	Return=0
+	for Resolver in $ResolversList; do
+		(( i++ ))
+		
+		# Update DB
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE dnscrypt_resolvers SET is_wished = '1' WHERE name = '$Resolver';"		
+		
+		# /etc/bind/named.conf.options
+		BindForwarders="$BindForwarders 127.0.0.$i port 52;"
+		
+		# Delete ghost screen pid file
+		if [ -e $DIR_PID/$Resolver.pid ]; then
+			pidofproc -p $DIR_PID/$Resolver.pid &> /dev/null || rm -f $DIR_PID/$Resolver.pid
+		fi
+
+		# Get options
+		DeamonOption "$Resolver" "127.0.0.$i:52"
+
+		# Return
+		#   0 if daemon has been started
+		#   1 if daemon was already running
+		#   2 if daemon could not be started
+		start-stop-daemon --start --quiet --background --make-pidfile --test \
+			--pidfile $DIR_PID/$Resolver.pid\
+			--exec $DAEMON\
+			-- $DEAMON_OPT\
+			 >> $LOG_FILE
+		
+		if [ $? -gt 0 ]; then
+			echo "--> $Resolver already running: "`date` >> $LOG_FILE
+			Return=1
+		fi
+
+		start-stop-daemon --start --quiet --background --make-pidfile \
+			--pidfile $DIR_PID/$Resolver.pid\
+			--exec $DAEMON\
+			-- $DEAMON_OPT\
+			 >> $LOG_FILE
+			 
+		if [ $? -gt 0 ]; then
+			delete_pid_file $DIR_PID/$Resolver.pid $Resolver			
+			echo "--> NOT STARTED: $Resolver : "`date` >> $LOG_FILE
+			Return=2
+		else
+			# Update DB
+			sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE dnscrypt_resolvers SET is_activated = '1' WHERE name = '$Resolver';"
+			echo "--> STARTED: $Resolver : "`date` >> $LOG_FILE
+		fi
+	done
+	
+	# /etc/bind/named.conf.options
+	BindForwarders="`echo $BindForwarders | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+	sed -i '/forwarders/d' /etc/bind/named.conf.options
+	sed -i '/forward only;/d' /etc/bind/named.conf.options
+	sed -i '/version/d' /etc/bind/named.conf.options
+	sed -i '/DNScrypt-proxy/d' /etc/bind/named.conf.options
+	NumLign=$(sed -n "/#### MARKER - DoNotDelete ####/=" /etc/bind/named.conf.options)
+	(( NumLign++ ))
+	sed -i "${NumLign}i\        // DNScrypt-proxy - BoF" /etc/bind/named.conf.options
+	(( NumLign++ ))
+	sed -i "${NumLign}i\        forwarders { $BindForwarders };" /etc/bind/named.conf.options
+	(( NumLign++ ))
+	sed -i "${NumLign}i\        forward only;" /etc/bind/named.conf.options
+	(( NumLign++ ))
+	sed -i "${NumLign}i\        version \"MySB Secured DNS server\";" /etc/bind/named.conf.options	
+	(( NumLign++ ))
+	sed -i "${NumLign}i\        // DNScrypt-proxy - EoF" /etc/bind/named.conf.options	
+
+	if [ -z "`ps ax | grep 'MySB_SecurityRules' | grep -e 'create' -e 'refresh' | grep -v 'grep'`" ]; then
+		screen -dmS MySB_SecurityRules /bin/bash <InstallDir>/bin/MySB_SecurityRules 'refresh' '--dnscrypt' 'SCREEN';
+	fi
+	
+	return $Return
+}
+
+# Function STOP the daemon/service
+do_stop() {
+	PidList="`ls -1r $DIR_PID/`"
+
+	# Return
+	#   0 if daemon has been stopped
+	#   1 if daemon was already stopped
+	#   2 if daemon could not be stopped
+	#   other if a failure occurred
+	for Pid in $PidList; do
+		Resolver="`echo $Pid | cut -d '.' -f 1`"
+		start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $DIR_PID/$Pid --exec "$DAEMON" 2>> $LOG_FILE
+		
+		case "$?" in
+			0|1)
+				echo "--> STOPPED: $Resolver : "`date` >> $LOG_FILE
+				delete_pid_file $DIR_PID/$Pid $Resolver
+				# Update DB
+				sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE dnscrypt_resolvers SET is_activated = '0' WHERE name = '$Resolver';"
+			;;
+			2)
+				echo "--> NOT STOPPED: $Resolver : "`date` >> $LOG_FILE
+			;;
+		esac
+	done
+	
+	# Ghost processes ?
+	pkill -f $DAEMON >> $LOG_FILE
+
+	# Restart Bind without DNScrypt-proxy support
+	sed -i '/forwarders/d' /etc/bind/named.conf.options
+	sed -i '/forward only;/d' /etc/bind/named.conf.options
+	sed -i '/version/d' /etc/bind/named.conf.options
+	sed -i '/DNScrypt-proxy/d' /etc/bind/named.conf.options
+	bind_check
+}
+#### Functions - End
+
+
+
+#### CASE - Begin
+case "$1" in
+	start)
+		log_daemon_msg "Starting $DESC" "$NAME"
+		do_start
+		case "$?" in
+			0|1)	
+				log_end_msg 0
+			;;
+			2)
+				log_end_msg 1
+			;;
+		esac		
+	;;
+
+	stop)
+		log_daemon_msg "Stopping $DESC" "$NAME"
+		do_stop
+		log_end_msg 0
+	;;
+
+	restart)
+		log_daemon_msg "Restarting $DESC" "$NAME"
+		do_stop
+		do_start
+		case "$?" in
+			0|1)	
+				log_end_msg 0
+			;;
+			2)
+				log_end_msg 1
+			;;
+		esac		
+	;;
+
+	status)
+		for Resolver in $ResolversList; do
+			status_of_proc -p "$DIR_PID/$Resolver.pid" "$DAEMON" "$Resolver" && log_end_msg
+		done
+		exit 0
+	;;
+
+	*)
+		echo "Usage: service dnscrypt-proxy {stop|status} [{start|restart} [--all] [[--nologs] [--dnnsec] [--resolver=resolver1,resolver2,...]]]"
+		echo
+		echo "Default, \"--nologs=yes\" and \"--dnnsec=yes\""
+		echo
+		echo "Example 1: \"service dnscrypt-proxy start --all\", DNScrypt-proxy will start using all available providers."
+		echo "Example 2: \"service dnscrypt-proxy start --nologs=no --dnssec=yes\", DNScrypt-proxy will start using all available providers that accept DNSsec and doesn't accept No Logs."
+		echo "Example 3: \"service dnscrypt-proxy start --resolver=resolver1,resolver2 --dnssec=yes\", DNScrypt-proxy will start using selected providers only that accept DNSsec."
+		echo
+		exit 3
+	;;
+esac
+#### CASE - End
+
+exit 0
+
+##################### LAST LINE ######################################

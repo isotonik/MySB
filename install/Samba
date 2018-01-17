@@ -1,0 +1,76 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+if [ "$ToInstall_Samba" == "YES" ]; then
+	#### Install packages
+	if ! CheckCommand 0 smbd; then
+		PackagesManage install "samba"
+	fi
+
+	#### smb.conf
+	echo "cp $MySB_InstallDir/templates/etc.samba.smb.conf.template /etc/samba/smb.conf"
+	cp $MySB_InstallDir/templates/etc.samba.smb.conf.template /etc/samba/smb.conf
+
+	#### /etc/samba/lmhosts
+	if [ ! -f /etc/samba/lmhosts ]; then
+		touch /etc/samba/lmhosts
+	fi
+
+	#### Create dummy interface
+	# NumLign=$(sed -n "/iface lo inet loopback/=" /etc/network/interfaces)
+	# NumLign=$(( NumLign+2 ))
+	# sed -i "${NumLign}i\# Dummy interface for samba (quiet logs)" /etc/network/interfaces
+	# (( NumLign++ ))
+	# sed -i "${NumLign}i\auto dummy0" /etc/network/interfaces
+	# (( NumLign++ ))
+	# sed -i "${NumLign}i\        iface dummy0 inet static" /etc/network/interfaces
+	# (( NumLign++ ))
+	# sed -i "${NumLign}i\        address 10.254.254.254" /etc/network/interfaces
+	# (( NumLign++ ))
+	# sed -i "${NumLign}i\        netmask 255.255.255.0" /etc/network/interfaces
+	# (( NumLign++ ))
+	# sed -i "${NumLign}i\ " /etc/network/interfaces
+	# dummy interface
+	# echo "alias netdev-dummy0 dummy" | tee -a /etc/modprobe.d/aliases.conf
+	# modprobe dummy numdummies=0
+
+	if CheckCommand 0 samba; then
+		sqlite3 -cmd '.timeout 150000' $MySB_DB "UPDATE services SET to_install = '0', is_installed = '1' WHERE serv_name = 'Samba';"
+	fi
+
+	#### Clean current log file
+	logrotate -f /etc/logrotate.d/samba
+
+	#### START services
+	if [ "$2" != "INSTALL" ]; then
+		ManageServices start "samba"
+	fi
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
