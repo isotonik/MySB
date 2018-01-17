@@ -1,0 +1,70 @@
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+######################################################################
+funcs_Fail2Ban=1
+##################### FIRST LINE #####################################
+
+#### Fail2Ban White List
+Fail2BanWhitheList() {
+	if [ -f /etc/fail2ban/jail.local ]; then
+		Fail2banWhiteList=""
+		AllUsersIPs="${SeedboxUsersIPs} ${MainUserIPs}"
+		AllUsersIPs="`echo $AllUsersIPs | sed -e "s/^ //g;"`"
+
+		if [ $1 -eq 1 ]; then log_daemon_msg "$SecurityRules_Fail2Ban_IgnoreList"; fi
+		if [ "$IpRestriction" == "YES" ]; then
+			# All users IPs
+			for IPv4 in $AllUsersIPs; do
+				IfExist="`echo $Fail2banWhiteList | grep "$IPv4"`"
+				if [ -z "$IfExist" ]; then
+					Fail2banWhiteList="${Fail2banWhiteList} ${IPv4}"
+				fi
+			done
+			unset IPv4
+		fi
+
+		# VPN local IPs
+		if [ "$IsInstalled_OpenVPN" == "YES" ]; then
+			for IPv4 in $VpnIPs; do
+				IfExist="`echo $Fail2banWhiteList | grep $IPv4`"
+				if [ -z "$IfExist" ]; then
+					Fail2banWhiteList="${Fail2banWhiteList} ${IPv4}"
+				fi
+			done
+			unset IPv4
+		fi
+
+		Fail2banWhiteList="`echo $Fail2banWhiteList | sed -e 's/^ //g;' | sed s,/,\\\\\\\\\\/,g`"
+		SEARCH="`cat /etc/fail2ban/jail.local | grep "ignoreip" | cut -d "=" -f 2 | sed -e 's/^ //g;' | sed s,/,\\\\\\\\\\/,g`"
+		if [ ! -z "$SEARCH" ]; then
+			perl -pi -e "s/$SEARCH/$Fail2banWhiteList/g" /etc/fail2ban/jail.local
+		else
+			NumLign=$(cat /etc/fail2ban/jail.local | grep 'ignoreip' -n -m 1 | cut -d ':' -f 1)
+			sed -i '/ignoreip/d' /etc/fail2ban/jail.local
+			sed -i ""$NumLign"i\ignoreip        = $Fail2banWhiteList" /etc/fail2ban/jail.local
+		fi
+		unset SEARCH
+		if [ $1 -eq 1 ]; then StatusLSB; fi
+	fi
+}
+
+##################### LAST LINE ######################################

@@ -1,0 +1,163 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Create dir
+if [ ! -d $MySB_InstallDir/ssl/trackers/ ]; then
+	mkdir $MySB_InstallDir/ssl/trackers/
+fi
+
+#### Clean certificates with bad links
+case "$1" in
+	"APPLYCONFIG")
+		DoCleanCertificates=0
+		DoGetRutorrentTrackers=0
+		DoGetUsersTrackers=0
+		DoUpdateUsersTracker=0
+	;;
+	*) # "REFRESH" or "INSTALL"
+		DoCleanCertificates=1
+		DoGetRutorrentTrackers=1
+		DoGetUsersTrackers=1
+		DoUpdateUsersTrackers=1
+	;;
+esac
+
+if [ "$DoCleanCertificates" == "1" ]; then
+	log_daemon_msg "Clean certificates with bad links"
+	LIST_CERTS=$(ls -la /etc/ssl/certs/ | awk '{ print $9 }')
+	for Cert in ${LIST_CERTS}; do
+		if [ "$Cert" != "" ] && [ "$Cert" != "." ] && [ "$Cert" != ".." ]; then
+
+			TARGET=$(ls -la /etc/ssl/certs/$Cert | awk '{ print $11 }')
+
+			if [ ! -f $TARGET ]; then
+				rm -f /etc/ssl/certs/$Cert
+			fi
+
+			unset Cert TARGET
+		fi
+	done
+	unset LIST_CERTS
+	StatusLSB
+fi
+
+# Allow all trackers in BIND
+perl -pi -e "s/^include \"\/etc\/bind\/MySB.zones.blakclists\";/#include \"\/etc\/bind\/MySB.zones.blakclists\";/g" /etc/bind/named.conf.local
+service bind9 reload
+
+#### Create trackers listing
+# 1 - Add ruTorrent trackers in db
+if [ "$DoGetRutorrentTrackers" == "1" ]; then
+	GetRutorrentTrackers
+fi
+
+# 2 - Add mainuser trackers in db
+if [ "$DoGetUsersTrackers" == "1" ]; then
+	GetUsersTrackers
+fi
+
+#### Update users trackers data
+if [ "$DoUpdateUsersTrackers" == "1" ]; then
+	TrackersList="`Func_SQL_Command 'SELECT' 'MySB_db' 'tracker' 'trackers_list' "origin = 'users' AND to_check = '1'"`"
+
+	for Tracker in $TrackersList; do
+		AddTracker $Tracker "users"
+	done
+fi
+
+#### Get certificates
+TrackersList="`Func_SQL_Command 'SELECT' 'MySB_db' 'tracker' 'trackers_list' "to_check = '1'"`"
+DoRehash=0
+
+for Tracker in $TrackersList; do
+	log_daemon_msg "Get certificate for $Tracker"
+	if [ "$IsInstalled_PeerGuardian" == "YES" ]; then
+		RemoveAfter=0
+		if [ -z "`cat /etc/pgl/allow.p2p | grep $Tracker`" ]; then
+			TrackersID="`Func_SQL_Command 'SELECT' 'MySB_db' 'id_trackers_list' 'trackers_list' "tracker = '$Tracker'"`"
+			TrackersIPv4="`Func_SQL_Command 'SELECT' 'MySB_db' 'ipv4' 'trackers_list_ipv4' "id_trackers_list = '$TrackersID'"`"
+			if [ ! -z "$TrackersIPv4" ]; then
+				RemoveAfter=1
+				for IPv4 in $TrackersIPv4; do
+					echo "$Tracker:$IPv4-255.255.255.255" >> /etc/pgl/allow.p2p
+				done
+				pglcmd restart > /dev/null
+			fi
+		fi
+	fi
+
+	cd $MySB_InstallDir/ssl/trackers/
+	PingCmd="`ping -c2 -w2 $Tracker | grep 'packets transmitted'`"
+	PacketsTransmitted="`echo $PingCmd | cut -d ',' -f 1 | awk '{ print $1 }'`"
+	PacketsReceived="`echo $PingCmd | cut -d ',' -f 2 | awk '{ print $1 }'`"
+
+	if [ "$PacketsReceived" == "$PacketsTransmitted" ] ; then
+		if [ ! -h /etc/ssl/certs/$Tracker.pem ] || [ ! -f $MySB_InstallDir/ssl/trackers/$Tracker.pem ]; then
+			openssl s_client -connect $Tracker:443 </dev/null 2>/dev/null | sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' >> ./$Tracker.crt
+			if [ -s ./$Tracker.crt ]; then
+				openssl x509 -in ./$Tracker.crt -out ./$Tracker.der -outform DER
+				openssl x509 -in ./$Tracker.der -inform DER -out ./$Tracker.pem -outform PEM
+				if [ -e ./$Tracker.pem ]; then
+					if [ -f /etc/ssl/certs/$Tracker.pem ]; then
+						rm -f /etc/ssl/certs/$Tracker.pem
+					fi
+					Func_SQL_Command 'UPDATE' 'MySB_db' 'trackers_list' "is_ssl = '1'" "tracker = '$Tracker'"
+					DoRehash=1
+				fi
+
+				rm -f ./$Tracker.der
+			fi
+		fi
+
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'trackers_list' "to_check = '0', ping = 'GOOD'" "tracker = '$Tracker'"
+		rm -f ./$Tracker.crt
+	else
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'trackers_list' "to_check = '0', ping = 'BAD'" "tracker = '$Tracker'"
+	fi
+
+	if [ $RemoveAfter -eq 1 ] && [ "$IsInstalled_PeerGuardian" == "YES" ]; then
+		sed -i '/'$Tracker'/d' /etc/pgl/allow.p2p
+		pglcmd restart > /dev/null
+	fi
+	StatusLSB
+done
+
+# Block all inactive trackers in BIND
+perl -pi -e "s/^#include \"\/etc\/bind\/MySB.zones.blakclists\";/include \"\/etc\/bind\/MySB.zones.blakclists\";/g" /etc/bind/named.conf.local
+service bind9 reload
+
+#### Create again certificates listing in system
+if [ "$DoRehash" == 1 ]; then
+	log_daemon_msg "Certificates Rehash"
+	c_rehash $MySB_InstallDir/ssl/trackers/
+	update-ca-certificates
+	StatusLSB
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

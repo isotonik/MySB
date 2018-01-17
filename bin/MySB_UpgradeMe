@@ -1,0 +1,242 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### VARs
+Type="$1"
+Continue=1
+Error=""
+
+#### Updating clock
+echo -e -n "${CBLUE}$UpgradeMe_Clock$CEND..."
+ping -c4 0.fr.pool.ntp.org > /dev/null 2>&1
+if [ $? -gt 0 ]; then
+	SwitchDNS "bind"
+fi
+/usr/sbin/ntpdate -u 0.fr.pool.ntp.org > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	echo -e "$Global_Done"
+else
+	echo -e "$Global_Failed"
+	Continue=0
+	Error="$UpgradeMe_Error_Clock"
+fi
+
+#### Check GitHub accessibility
+echo -e -n "${CBLUE}$UpgradeMe_GitHubAccess$CEND..."
+ping -c4 github.com > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	echo -e "$Global_Done"
+else
+	echo -e "$Global_Failed"
+	Continue=0
+	Error="$UpgradeMe_Error_GitHubAccess"
+fi
+
+#### Update actual repo
+if [ "$Continue" == "1" ]; then
+	echo -e -n "${CBLUE}$UpgradeMe_UpdateGithub$CEND..."
+	ScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/bin/MySB_GitHubRepoUpdate" 'REFRESH'
+	StatusSTD
+fi
+
+#### Check if new version
+MySB_NewVersion="`cat $MySB_InstallDir/version`"
+
+if [ "$MySB_CurrentVersion" == "$MySB_NewVersion" ]; then
+	UpgradeMe_UpToDate="`echo $UpgradeMe_UpToDate | sed "s/#version#/$MySB_NewVersion/g;"`"
+	echo
+	echo -e "$UpgradeMe_UpToDate"
+	echo
+	EndingScript 0
+else
+	case "$Type" in
+		"CRON")
+			SendMail "MySB - $UpgradeMe_NewVersion ($MySB_NewVersion)" "$MainUser" "new_version" "$UpgradeMe_NewVersion"
+
+			EndingScript 0
+		;;
+		*)
+			UpgradeMe_Msg_VersionAvailable="`echo $UpgradeMe_Msg_VersionAvailable | sed "s/#version#/$MySB_NewVersion/g;"`"
+			echo
+			echo -e "$UpgradeMe_Msg_VersionAvailable"
+			echo
+			QuestionGetString NO "$Global_WantToContinue" CONTINUE $Global_NO
+			CONTINUE="`echo $CONTINUE | tr '[:lower:]' '[:upper:]'`"
+			if [ "$CONTINUE" == "$Global_NO" ]; then
+				EndingScript 0
+			fi
+		;;
+	esac
+fi
+
+#### Backup
+if [ "$Continue" == "1" ]; then
+	DateTime="`/bin/date +%Y%m%d-%H%M%S`"
+	echo -e "${CBLUE}$UpgradeMe_CreateBackup '/opt/MySB_backup/Backup-$DateTime-$MySB_CurrentVersion.tar.gz'$CEND"
+	echo -e -n "${CRED}$Global_PleaseWait $CEND"
+	CountDown 3
+
+	# Cleaning MySB before compress
+	CleanBeforeUpgrade
+
+	# MySQL databases DUMP
+	DbList="`ls -1AFh /var/lib/mysql/`"
+	for Database in $DbList; do
+		if [ -d /var/lib/mysql/$Database/ ]; then
+			case "$Database" in
+				'mysql/'|'performance_schema/')
+					continue
+				;;
+				*)
+					mysqldump --defaults-extra-file=/root/.config.cnf MySB_db > $MySB_InstallDir/db/MySQL_$Database-$DateTime-$MySB_CurrentVersion.dump.sql
+				;;
+			esac
+		fi
+	done
+
+	# Creating backup directory if doesn't exist
+	if [ ! -d /opt/MySB_backup ]; then
+		mkdir -p /opt/MySB_backup
+	fi
+
+	# Creating archive
+	if [ -f $MySB_InstallDir/temp/dev ]; then
+		tar -zcvf /opt/MySB_backup/Backup-$DateTime-$MySB_CurrentVersion.tar.gz /etc
+	else
+		tar -zcvf /opt/MySB_backup/Backup-$DateTime-$MySB_CurrentVersion.tar.gz $MySB_InstallDir /etc
+	fi
+	if [ $? -gt 0 ]; then
+		Continue=0
+		UpgradeMe_Error_CreateBackup="`echo $UpgradeMe_Error_CreateBackup | sed "s/#file#/Backup-$DateTime-$MySB_CurrentVersion.tar.gz/g;"`"
+		Error="$UpgradeMe_Error_CreateBackup"
+	else
+		if  [ ! -f /opt/MySB_backup/Backup-$DateTime-$MySB_CurrentVersion.tar.gz ]; then
+			Continue=0
+			Error="$UpgradeMe_Error_BackupFailed"
+		fi
+	fi
+fi
+
+#### MySB Script GitHub
+if [ "$Continue" == "1" ]; then
+	echo
+	UpgradeMe_Merge="`echo $UpgradeMe_Merge | sed "s/#current_version#/$MySB_CurrentVersion/g;" | sed "s/#new_version#/$MySB_NewVersion/g;"`"
+	echo -e "${CBLUE}$UpgradeMe_Merge$CEND"
+	echo -e -n "${CRED}$Global_PleaseWait $CEND"
+	CountDown 3
+	echo
+
+	cd $MySB_InstallDir/
+
+	git fetch --all
+	if [ $? -gt 0 ]; then
+		Continue=0
+		Error="$UpgradeMe_Error_GitFetch"
+	fi
+
+	if [ "$Continue" == "1" ]; then
+		git stash
+		if [ $? -gt 0 ]; then
+			Continue=0
+			Error="$UpgradeMe_Error_GitPull"
+		fi
+	fi
+
+	if [ "$Continue" == "1" ]; then
+		git checkout -b $MySB_NewVersion origin/$MySB_NewVersion
+		if [ $? -gt 0 ]; then
+			Continue=0
+			UpgradeMe_Error_GitCheckout="`echo $UpgradeMe_Error_GitCheckout | sed "s/#new_version#/$MySB_NewVersion/g;"`"
+			Error="$UpgradeMe_Error_GitCheckout"
+		fi
+	fi
+
+	if [ "$Continue" == "1" ]; then
+		git pull
+		if [ $? -gt 0 ]; then
+			Continue=0
+			Error="$UpgradeMe_Error_GitPull"
+		fi
+	fi
+
+	if [ "$Continue" == "1" ]; then
+		#### Update version info
+		echo
+		echo -e -n "${CBLUE}$Global_UpdatingVersion$CEND..."
+		echo "MySB_CurrentVersion=\"$MySB_NewVersion\"" > $MySB_InstallDir/files/current_version
+		rm -f $MySB_InstallDir/files/banner_*
+		echo -e "$Global_Done"
+	fi
+fi
+
+#### Completing the upgrade
+MySB_NewVersion="`cat $MySB_InstallDir/version`"
+MySB_RepoVersion="`cd $MySB_InstallDir/ && git branch | grep '*' | awk '{ print $2 }'`"
+
+if [ "$Continue" == "1" ] && [ "$MySB_NewVersion" == "$MySB_RepoVersion" ]; then
+	if [ -f $MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh ]; then
+		echo
+		echo -e "${CBLUE}$UpgradeMe_StartScreen$CEND"
+		screen -wipe &> /dev/null
+		screen -dmS MySB_Upgrade /bin/bash $MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh;
+		echo -e -n "${CRED}$Global_PleaseWait $CEND"
+		CountDown 10
+
+		screen -r MySB_Upgrade
+	else
+		Continue=0
+		Error="$UpgradeMe_Error_UpgradeSciptMissing ($MySB_InstallDir/upgrade/From_$MySB_CurrentVersion-to-$MySB_NewVersion.bsh)"
+	fi
+fi
+
+#### Statistics
+# No credentials are retained !
+# The server IP is only used to know the country of the SeedBox.
+if [ -f /etc/machine-id ] && [ ! -f $MySB_InstallDir/statistics ]; then
+	gsMachineId="`cat /etc/machine-id`"
+	[ ! -z "$gsMachineId" ] && gsResult="`curl --silent --retry 2 -A 'MySB' --data "version=$MySB_CurrentVersion&machine_id=$gsMachineId" http://mysb.is-by.us/statistics/`"
+	[ ! -z "`echo $gsResult | grep 'Statistics updated at'`" ] && echo "$gsResult" > $MySB_InstallDir/statistics
+fi
+
+#### Finished
+clear
+if [ -f $MySB_InstallDir/temp/dev ]; then
+	rm -vf $MySB_InstallDir/temp/dev
+fi
+if [ "$Continue" == "1" ]; then
+	echo -e "${CGREEN}$UpgradeMe_UpgradeFinished$CEND"
+	echo
+else
+	echo -e "${CRED}$UpgradeMe_ErrorOccured$CEND"
+	echo -e "${CRED}$Error$CEND"
+	echo
+	EndingScript 0
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

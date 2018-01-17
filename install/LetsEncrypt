@@ -1,0 +1,143 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+# Server list:		https://letsencrypt.status.io/
+# For test:			Add '--test-cert'
+# Documentation:	https://certbot.eff.org/docs/intro.html
+######################################################################
+
+#### VARs
+LocSwitch="$2"	# INSTALL / UPGRADE / CRON
+LetsEncryptDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'Lets Encrypt'"`"
+LetsEncryptUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Lets Encrypt'"`"
+LetsEncryptFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Lets Encrypt'"`"
+LetsEncryptVersion="`Func_SQL_Command 'SELECT' 'MySB_db' 'version' 'repositories' "name = 'Lets Encrypt'"`"
+
+#### INSTALL
+if [ "$LocSwitch" == "INSTALL" ]; then
+	PackagesManage install "libaugeas0 augeas-lenses" "backports"
+	PackagesManage install "python-virtualenv python-dev gcc dialog libssl-dev libffi-dev ca-certificates"
+fi
+
+echo
+echo "########## Let's Encrypt"
+echo "Directory : "$LetsEncryptDir
+echo "Version : "$LetsEncryptVersion
+echo "File : "$LetsEncryptFile
+echo "URL : "$LetsEncryptUrl
+echo
+if [ -d $LetsEncryptDir ]; then
+	GitPull $LetsEncryptDir/
+else
+	if [ -f $MySB_InstallDir/files/$LetsEncryptFile ]; then
+		unzip $MySB_InstallDir/files/$LetsEncryptFile -d $MySB_InstallDir/temp/
+		SubDir="`unzip -l $MySB_InstallDir/files/$LetsEncryptFile | awk '{ print $4 }' | cut -d '/' -f 1 | uniq | sed '1,3d;$d'`"
+		if [ -d $MySB_InstallDir/temp/$SubDir ]; then
+			mv -v $MySB_InstallDir/temp/$SubDir $LetsEncryptDir
+		fi
+		if [ -d $LetsEncryptDir ]; then
+			GitPull $LetsEncryptDir/
+		fi
+	else
+		git clone $LetsEncryptUrl $LetsEncryptDir
+	fi
+fi
+
+#### Generate
+ServerList="`Func_SQL_Command 'SELECT' 'MySB_db' 'addresses' 'lets_encrypt' "1" | sed -e 's/^ //g;' | sed 's/\s+$//'`"
+if [ ! -z "$ServerList" ]; then
+	Func_SQL_Command 'DELETE' 'MySB_db' 'lets_encrypt' "1" '-echo'
+fi
+for Server in $ServerList; do
+	ServerIPv4="$(nslookup $Server | grep 'Address:' | awk '{ print $2 }' | tail -n +2)"
+	if [ ! -z "$ServerIPv4" ]; then
+		for IPv4 in $ServerIPv4; do
+			Func_SQL_Command 'INSERT' 'MySB_db' 'lets_encrypt' 'ipv4,addresses' "'$IPv4', '$Server'" '-echo'
+		done
+	fi
+done
+Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "letsencrypt_openport='1'" "id_system='1'" '-echo'
+ScriptInvoke 'source' "$MySB_InstallDir/bin/MySB_SecurityRules" 'refresh' '--letsencrypt'
+
+if [ ! -f /etc/letsencrypt/live/$HostNameFQDN/fullchain.pem ]; then # Is it a new certificate ?
+	# Config file
+	echo "rsa-key-size = 2048" > /tmp/cli.ini
+	echo "email = $MainUserEmail" >> /tmp/cli.ini
+	echo "domains = $HostNameFQDN" >> /tmp/cli.ini
+	echo "standalone-supported-challenges = tls-sni-01" >> /tmp/cli.ini
+	echo "text = True" >> /tmp/cli.ini
+	echo "verbose = True" >> /tmp/cli.ini
+	# Dev mode ?
+	if [ -f $MySB_InstallDir/temp/dev ]; then
+		echo "test-cert = True" >> /tmp/cli.ini
+	fi
+
+	cd $LetsEncryptDir
+	#./letsencrypt-auto certonly --non-interactive --standalone --agree-tos --redirect --tls-sni-01-port $Port_HTTPS --config /tmp/cli.ini
+	#./certbot-auto certonly --non-interactive --standalone --agree-tos --redirect --config /tmp/cli.ini --pre-hook "service nginx stop" --post-hook "service nginx start"
+	./certbot-auto certonly --standalone --non-interactive --agree-tos --tls-sni-01-port $Port_HTTPS --hsts --uir --config /tmp/cli.ini --pre-hook "service nginx stop" --post-hook "service nginx start"
+	#./certbot-auto certonly --webroot -w $MySB_InstallDir/web/ --non-interactive --agree-tos --tls-sni-01-port $Port_HTTPS --hsts --uir --config /tmp/cli.ini --pre-hook "service nginx stop" --post-hook "service nginx start"
+
+	if [ -f /etc/letsencrypt/live/$HostNameFQDN/fullchain.pem ] && [ ! -h $MySB_InstallDir/ssl/fullchain.pem ]; then
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/fullchain.pem $MySB_InstallDir/ssl/fullchain.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/chain.pem $MySB_InstallDir/ssl/chain.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/cert.pem $MySB_InstallDir/ssl/cert.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/privkey.pem $MySB_InstallDir/ssl/privkey.pem
+		Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "letsencrypt_date='NOW'" "id_system='1'" '-echo'
+	fi
+
+	Func_SQL_Command 'UPDATE' 'MySB_db' 'services' "to_install = '0', is_installed = '1'" "serv_name = 'Lets Encrypt'" '-echo'
+else # Or is it a renew ?
+	if [ ! -h $MySB_InstallDir/ssl/fullchain.pem ]; then
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/fullchain.pem $MySB_InstallDir/ssl/fullchain.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/chain.pem $MySB_InstallDir/ssl/chain.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/cert.pem $MySB_InstallDir/ssl/cert.pem
+		ln -sv /etc/letsencrypt/live/$HostNameFQDN/privkey.pem $MySB_InstallDir/ssl/privkey.pem
+	fi
+
+	if [ "$1" == "renew" ]; then
+		LetsEncryptDate="`Func_SQL_Command 'SELECT' 'MySB_db' 'letsencrypt_date' 'system' '1'`"
+		if [ ! -z "$LetsEncryptDate" ]; then
+			LetsEncryptDate=$(date -d "$LetsEncryptDate" +"%Y-%m-%d")
+			Now=$(date +%Y-%m-%d)
+			t1=$(date --date="$LetsEncryptDate" +'%-m')
+			t2=$(date --date="$Now" +'%-m')
+			let "tDiff=$t2-$t1"
+
+			if [ "$tDiff" -gt "2" ]; then
+				cd $LetsEncryptDir
+				./certbot-auto renew
+			fi
+		fi
+	fi
+fi
+
+Func_SQL_Command 'UPDATE' 'MySB_db' 'system' "letsencrypt_openport = '0'" 'id_system = 1' '-echo'
+ScriptInvoke 'ScreenSTD' "$MySB_InstallDir/bin/MySB_SecurityRules" 'create' 'CRON'
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################

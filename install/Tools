@@ -1,0 +1,76 @@
+#!/bin/bash
+# ----------------------------------
+source $(dirname $0)/../inc/includes_before
+# ----------------------------------
+#  __/\\\\____________/\\\\___________________/\\\\\\\\\\\____/\\\\\\\\\\\\\___
+#   _\/\\\\\\________/\\\\\\_________________/\\\/////////\\\_\/\\\/////////\\\_
+#    _\/\\\//\\\____/\\\//\\\____/\\\__/\\\__\//\\\______\///__\/\\\_______\/\\\_
+#     _\/\\\\///\\\/\\\/_\/\\\___\//\\\/\\\____\////\\\_________\/\\\\\\\\\\\\\\__
+#      _\/\\\__\///\\\/___\/\\\____\//\\\\\________\////\\\______\/\\\/////////\\\_
+#       _\/\\\____\///_____\/\\\_____\//\\\____________\////\\\___\/\\\_______\/\\\_
+#        _\/\\\_____________\/\\\__/\\_/\\\______/\\\______\//\\\__\/\\\_______\/\\\_
+#         _\/\\\_____________\/\\\_\//\\\\/______\///\\\\\\\\\\\/___\/\\\\\\\\\\\\\/__
+#          _\///______________\///___\////__________\///////////_____\/////////////_____
+#			By toulousain79 ---> https://github.com/toulousain79/
+#
+######################################################################
+#
+#	Copyright (c) 2013 toulousain79 (https://github.com/toulousain79/)
+#	Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#	The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+#	IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#	--> Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
+#
+##################### FIRST LINE #####################################
+
+#### Composer
+ComposerDir="`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'Composer'"`"
+ComposerUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'Composer'"`"
+ComposerFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'Composer'"`"
+ComposerToUpgrade="`Func_SQL_Command 'SELECT' 'MySB_db' 'upgrade' 'repositories' "name = 'Composer'"`"
+if ! CheckCommand 0 composer || [ $ComposerToUpgrade -eq 1 ]; then
+	if [ -f $MySB_InstallDir/files/$ComposerFile ]; then
+		cp -v $MySB_InstallDir/files/$ComposerFile $ComposerDir
+	else
+		curl --insecure -sS $ComposerUrl | php -- --install-dir=$MySB_InstallDir/files/
+		cp -v $MySB_InstallDir/files/$ComposerFile $ComposerDir
+	fi
+fi
+chmod +x /usr/bin/composer
+composer self-update
+
+#### NodeJS
+NodeDir=$MySB_InstallDir"`Func_SQL_Command 'SELECT' 'MySB_db' 'dir' 'repositories' "name = 'NodeJS'"`"
+NodeUrl="`Func_SQL_Command 'SELECT' 'MySB_db' 'url' 'repositories' "name = 'NodeJS'"`"
+NodeFile="`Func_SQL_Command 'SELECT' 'MySB_db' 'file' 'repositories' "name = 'NodeJS'"`"
+if [ ! -f $MySB_InstallDir/files/$NodeFile ]; then
+	wget --no-check-certificate $NodeUrl -O $MySB_InstallDir/files/$NodeFile
+fi
+if [ ! -d $NodeDir ]; then
+	tar -zxvf $MySB_InstallDir/files/$NodeFile -C $MySB_InstallDir/temp/
+	SubDir="`tar -ztf $MySB_InstallDir/files/$NodeFile | cut -d '/' -f 1 | uniq`"
+	if [ -d $MySB_InstallDir/temp/$SubDir ]; then
+		mv -v $MySB_InstallDir/temp/$SubDir $NodeDir
+	fi
+fi
+cd $NodeDir
+if [ -d out/ ]; then
+	make clean
+fi
+./configure
+make -j$PROCESSOR
+make install
+/sbin/ldconfig
+
+#### Bower
+if CheckCommand 0 bower; then
+	bower update --allow-root --config.interactive=false
+else
+	npm install -g bower
+fi
+
+# -----------------------------------------
+source $(dirname $0)/../inc/includes_after
+# -----------------------------------------
+##################### LAST LINE ######################################
