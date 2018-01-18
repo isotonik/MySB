@@ -33,6 +33,10 @@ fi
 RemovePluginCakebox=NO
 RemovePluginManager=NO
 
+#### Git LFS pull
+cd $MySB_InstallDir/
+git lfs pull
+
 #### Get all repos
 cmdMySQL 'MySB_db' "SELECT name FROM repositories WHERE active='1';" | while read sRepoName; do \
 	gfnGetRepoValues "$sRepoName"

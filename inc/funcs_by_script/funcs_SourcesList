@@ -124,6 +124,24 @@ gfnCreateLocalMirror() {
 	chmod 0700 $MySB_InstallDir/files/apt_mirrors/var/*.sh
 	chown apt-mirror:apt-mirror $MySB_InstallDir/files/apt_mirrors/var/*.sh
 
+	#### Git LFS
+	# GPG Key
+	if [ ! -f /etc/apt/sources.list.d/webmin.list ]; then
+		if [ ! -f $MySB_InstallDir/files/repos_keys/git-lfs.key ]; then
+			$binCURL -o "$MySB_InstallDir/files/repos_keys/git-lfs.key" "https://packagecloud.io/github/git-lfs/gpgkey"
+		fi
+		if [ -f $MySB_InstallDir/files/repos_keys/git-lfs.key ]; then
+			apt-key add $MySB_InstallDir/files/repos_keys/git-lfs.key
+		fi
+	fi
+	# Local mirrors
+	echo "# Git LFS" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
+	echo "deb https://packagecloud.io/github/git-lfs/debian/ ${gsDebianRelease} main" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
+	echo "clean https://packagecloud.io/github/git-lfs/debian/" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
+	# git-lfs.list (local)
+	echo "# Git LFS" > /etc/apt/sources.list.d/git-lfs.list
+	echo "deb file://$MySB_InstallDir/files/apt_mirrors/mirrors/packagecloud.io/github/git-lfs/debian/ ${gsDebianRelease} main" >> /etc/apt/sources.list.d/git-lfs.list
+
 	#### Peerguardian
 	if [ "$gbToInstall_PeerGuardian" == "YES" ] || [ "$gbIsInstalled_PeerGuardian" == "YES" ]; then
 		# GPG Key

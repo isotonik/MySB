@@ -1,5 +1,6 @@
 	Version v5.1
 		2018/01/15
+			- Use of Git LFS, tracking *.zip, *.tar.gz, *.deb and *.wbm files
 			- OpenVPN Admin for Webmin v3.1
 			- Maxmind GeoIP v2.5.0
 			- Plex Media Server v1.10.1.4602
