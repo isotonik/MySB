@@ -37,9 +37,9 @@ gfnStatusLSB
 #### update Git Hub
 echo
 cd $MySB_InstallDir/
-git stash
+git fetch origin
+git reset --hard origin/$gsCurrentVersion
 git pull
-git stash clear
 echo
 
 #### Create directories & change rights
