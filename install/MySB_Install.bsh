@@ -23,7 +23,7 @@
 ##################### FIRST LINE #####################################
 
 ##################### VARS ###########################################
-gsCurrentVersion="v5.1"
+gsCurrentVersion="v5.x"
 MySB_InstallDir="/opt/MySB"
 for Arg in "$@"; do
 	case "$Arg" in
@@ -456,7 +456,7 @@ while [ -z "$Answer" ]; do
 done
 
 # First we disable IPv6
-sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.all.disable_ipv6=1 >> /tmp/`basename $0`.log
 
 # We do an update
 BannerInstall

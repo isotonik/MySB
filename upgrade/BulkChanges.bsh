@@ -79,8 +79,6 @@ case "$1" in
 
 		# Update version info
 		cmdMySQL 'MySB_db' "UPDATE system SET mysb_version = '$gsCurrentVersion' WHERE id_system='1';" -v
-		figlet MySB $gsCurrentVersion > /etc/motd
-		echo >> /etc/motd
 
 		# Send mail for each user with new version
 		source $MySB_InstallDir/inc/vars
@@ -112,16 +110,16 @@ case "$1" in
 		####################################
 
 		# Cleaning
-		if [ -f /etc/init.d/plexmediaserver.dpkg-bak ]; then rm -vf /etc/init.d/plexmediaserver.dpkg-bak; fi
-		if [ -f /etc/samba/smb.conf.ucf-dist ]; then rm -vf /etc/samba/smb.conf.ucf-dist; fi
-		if [ -f /etc/logrotate.d/fail2ban.dpkg-dist ]; then rm -vf /etc/logrotate.d/fail2ban.dpkg-dist; fi
-		if [ -f /etc/logrotate.d/samba.dpkg-dist ]; then rm -vf /etc/logrotate.d/samba.dpkg-dist; fi
-		if [ -f /etc/vim/vimrc.dpkg-dist ]; then rm -vf /etc/vim/vimrc.dpkg-dist; fi
-		if [ -f /etc/default/stunnel4.dpkg-dist ]; then rm -vf /etc/default/stunnel4.dpkg-dist; fi
-		if [ -f /etc/init.d/nfs-kernel-server.dpkg-dist ]; then rm -vf /etc/init.d/nfs-kernel-server.dpkg-dist; fi
-		if [ -f /etc/init.d/bind9.dpkg-dist ]; then rm -vf /etc/init.d/bind9.dpkg-dist; fi
-		if [ -f /etc/vsftpd.conf.dpkg-dist ]; then rm -vf /etc/vsftpd.conf.dpkg-dist; fi
-		if [ -f /etc/fail2ban/fail2ban.conf.dpkg-dist ]; then rm -vf /etc/fail2ban/fail2ban.conf.dpkg-dist; fi
+		rm -vf /etc/init.d/plexmediaserver.dpkg-bak
+		rm -vf /etc/samba/smb.conf.ucf-dist
+		rm -vf /etc/logrotate.d/fail2ban.dpkg-dist
+		rm -vf /etc/logrotate.d/samba.dpkg-dist
+		rm -vf /etc/vim/vimrc.dpkg-dist
+		rm -vf /etc/default/stunnel4.dpkg-dist
+		rm -vf /etc/init.d/nfs-kernel-server.dpkg-dist
+		rm -vf /etc/init.d/bind9.dpkg-dist
+		rm -vf /etc/vsftpd.conf.dpkg-dist
+		rm -vf /etc/fail2ban/fail2ban.conf.dpkg-dist
 
 		#### Apply quota for users
 		gfnManageQuota '-v'

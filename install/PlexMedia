@@ -61,9 +61,9 @@ if [ "$gbToInstall_PlexMedia" == "YES" ]; then
 	fnInstallDebPackage
 
 	#### NginX
-	# install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.locations.plexmediaserver.conf.tmpl /etc/nginx/locations/PlexMediaServer.conf
-	# install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.upstream.plexmediaserver.conf.tmpl /etc/nginx/upstream/PlexMediaServer.conf
-	# install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.proxy.plexmediaserver.conf.tmpl /etc/nginx/proxy/PlexMediaServer.conf
+	install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.locations.plexmediaserver.conf.tmpl /etc/nginx/locations/PlexMediaServer.conf
+	install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.upstream.plexmediaserver.conf.tmpl /etc/nginx/upstream/PlexMediaServer.conf
+	install -v -o root -g root -m 0600 $MySB_InstallDir/templates/nginx/etc.nginx.proxy.plexmediaserver.conf.tmpl /etc/nginx/proxy/PlexMediaServer.conf
 
 	if gfnCheckCommand 0 plexmediaserver; then
 		cmdMySQL 'MySB_db' "UPDATE services SET to_install = '0', is_installed = '1' WHERE serv_name='Plex Media Server';" -v
@@ -130,7 +130,7 @@ if [ "$gbToInstall_PlexMedia" == "YES" ]; then
 			perl -pi -e "s/<MainUser>/$gsMainUserName/g" /etc/nginx/locations/PlexPy.conf
 
 			# Update certificates for python
-			update-ca-certificates --verbose --fresh
+			update-ca-certificates --verbose --fresh &> /dev/null
 
 			# START services
 			gfnManageServices start "plexmediaserver nginx plexpy"
