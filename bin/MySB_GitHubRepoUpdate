@@ -36,7 +36,10 @@ StatusLSB
 
 #### update Git Hub
 echo
-GitPull $MySB_InstallDir/
+cd $MySB_InstallDir/
+git fetch origin
+git reset --hard origin/$MySB_CurrentVersion
+git pull
 echo
 
 #### DEV - To force an upgrade
