@@ -32,12 +32,13 @@ if [ $? -gt 0 ]; then
 fi
 StatusLSB
 
-#### change working directory
-cd $MySB_InstallDir/
-
 #### update Git Hub
-git stash
+echo
+cd $MySB_InstallDir/
+git fetch origin
+git reset --hard origin/$MySB_CurrentVersion
 git pull
+echo
 
 #### Create directories & change rights
 log_daemon_msg "Change owners and rights for files and directories"
