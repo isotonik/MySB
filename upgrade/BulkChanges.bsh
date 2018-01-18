@@ -61,53 +61,10 @@ case "$1" in
 		rm -rfv $MySB_InstallDir/ssl/GeoTrust/
 		rm -rfv $MySB_InstallDir/ssl/GoDaddy/
 
-		#### Remove rTorrent incomplete directory
+		#### Remove rTorrent incomplete directory && remove old sync DB
 		for seedUser in $gsUsersList; do
 			rm -rfv /home/$seedUser/rtorrent/incomplete/
-		done
-
-
-
-
-		#### Sync DB
-		for seedUser in $gsUsersList; do
-			sNewDatabaseUser="/home/$seedUser/db/$seedUser.sq3"
-			sOldDatabaseUser="/home/$seedUser/db/old.sq3"
-			mv -v $sNewDatabaseUser $sOldDatabaseUser
-			cp -v $gsSync_DB $sNewDatabaseUser
-			# ident
-			ModeSync="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT mode_sync FROM ident WHERE ident_id = '1';"`"
-			DstDir="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_dir FROM ident WHERE ident_id = '1';"`"
-			DstSrv="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_srv FROM ident WHERE ident_id = '1';"`"
-			DstPort="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_port FROM ident WHERE ident_id = '1';"`"
-			DstUser="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_user FROM ident WHERE ident_id = '1';"`"
-			DstPass="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT dst_pass FROM ident WHERE ident_id = '1';"`"
-			MaxToSync="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT max_to_sync FROM ident WHERE ident_id = '1';"`"
-			CreateSubDir="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT create_subdir FROM ident WHERE ident_id = '1';"`"
-			MailObjectOK="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT MailObjectOK FROM ident WHERE ident_id = '1';"`"
-			MailObjectKO="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT MailObjectKO FROM ident WHERE ident_id = '1';"`"
-			sqlite3 -cmd '.timeout 150000' $sNewDatabaseUser "UPDATE ident SET mode_sync = '$ModeSync', dst_dir = '$DstDir', dst_srv = '$DstSrv', dst_port = '$DstPort', dst_user = '$DstUser', dst_pass = '$DstPass', max_to_sync = '$MaxToSync', create_subdir = '$CreateSubDir', MailObjectOK = '$MailObjectOK', MailObjectKO = '$MailObjectKO' WHERE ident_id = '1';" -echo
-			# categories
-			Categories="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT name,sync_mode FROM categories WHERE 1;" | sed 's/\t/|/g;'`"
-			for Category in $Categories; do
-				name="`echo $Category | awk '{split($0,a,"|"); print a[1]}'`"
-				sync_mode="`echo $Category | awk '{split($0,a,"|"); print a[2]}'`"
-				sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "INSERT INTO categories (name,sync_mode) VALUES ('$name','$sync_mode');" -echo
-			done
-			# list
-			Lists="`sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "SELECT list_category,is_active,get_base_path,get_custom1,get_name,get_loaded_file,CategoryDir,comments,to_del FROM list WHERE 1;" | sed 's/\t/|/g;'`"
-			for List in $Lists; do
-				list_category="`echo $Category | awk '{split($0,a,"|"); print a[1]}'`"
-				is_active="`echo $Category | awk '{split($0,a,"|"); print a[2]}'`"
-				get_base_path="`echo $Category | awk '{split($0,a,"|"); print a[3]}'`"
-				get_custom1="`echo $Category | awk '{split($0,a,"|"); print a[4]}'`"
-				get_name="`echo $Category | awk '{split($0,a,"|"); print a[5]}'`"
-				get_loaded_file="`echo $Category | awk '{split($0,a,"|"); print a[6]}'`"
-				CategoryDir="`echo $Category | awk '{split($0,a,"|"); print a[7]}'`"
-				comments="`echo $Category | awk '{split($0,a,"|"); print a[8]}'`"
-				to_del="`echo $Category | awk '{split($0,a,"|"); print a[9]}'`"
-				sqlite3 -cmd '.timeout 150000' $sOldDatabaseUser "INSERT INTO categories (list_category,is_active,get_base_path,get_directory,get_custom1,get_name,get_loaded_file,comments,to_del) VALUES ('$list_category','$is_active','$get_base_path','$CategoryDir','$get_custom1','$get_name','$get_loaded_file','$comments','$to_del'	);" -echo
-			done
+			rm -fv /home/$seedUser/db/old.sq3
 		done
 	;;
 	"AFTER")

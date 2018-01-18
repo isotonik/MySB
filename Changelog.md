@@ -4,6 +4,8 @@
 			- Remove rTorrent incomplete directory
 			- Remove Debian Wheezy possibilities
 			- Add statistics question
+			- Certbot-auto script v0.20.0
+			- PlexMedia, add deb file for x86_64
 
 	Version v5.1
 		2018/01/15

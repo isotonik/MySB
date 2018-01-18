@@ -35,16 +35,11 @@ fnInstallDebPackage() {
 		64)	sPlexDeb="plexmediaserver_${sPlexMediaVersion}_amd64.deb";;
 		*)	sPlexDeb="plexmediaserver_${sPlexMediaVersion}_i386.deb";;
 	esac
-	rm -vf $MySB_InstallDir/files/plexmediaserver_*.deb
 	[ ! -f $MySB_InstallDir/files/$sPlexDeb ] && curl --retry 3 --silent --insecure --location --show-error -o "$MySB_InstallDir/files/$sPlexDeb" "https://downloads.plex.tv/plex-media-server/${sPlexMediaVersion}/$sPlexDeb"
 
 	[ -f $MySB_InstallDir/files/$sPlexDeb ] && dpkg -i $MySB_InstallDir/files/$sPlexDeb
-	case "$gsDebianRelease" in
-		'jessie'|'stretch')
-			systemctl daemon-reload
-			systemctl enable plexmediaserver.service
-		;;
-	esac
+	systemctl daemon-reload
+	systemctl enable plexmediaserver.service
 }
 
 #### CRON UPGRADE
