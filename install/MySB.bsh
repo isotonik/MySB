@@ -95,12 +95,6 @@ echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $MySB_Step_NeededPackages$CEND..."
 gfnScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/Packages" 'INSTALL'
 gfnStatusSTD
 
-#### CPAN
-(( CurrentSTEP++ ))
-echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $MySB_Step_CPAN$CEND..."
-gfnScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/CPAN" 'INSTALL'
-gfnStatusSTD
-
 #### SSH
 (( CurrentSTEP++ ))
 echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $MySB_InstallingConfiguring SSH$CEND..."
@@ -122,6 +116,12 @@ esac
 (( CurrentSTEP++ ))
 echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $MySB_Step_Optimiszation$CEND..."
 gfnScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/Tweaks" 'INSTALL'
+gfnStatusSTD
+
+#### CPAN
+(( CurrentSTEP++ ))
+echo -e -n "${CBLUE}$CurrentSTEP/$TotalSTEP	- $MySB_Step_CPAN$CEND..."
+gfnScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/CPAN" 'INSTALL'
 gfnStatusSTD
 
 #### Quota

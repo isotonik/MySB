@@ -112,7 +112,6 @@ ${CRED}############################################################$CEND"
 	CantWriteConfig="${CRED}I can't write the config file \"/etc/MySB/config\", aborting !$CEND"
 	LoadingVar="${CBLUE}Loading variables and functions$CEND..."
 	CreatingDir="${CBLUE}Creating directories$CEND..."
-	SourcesDebian="${CBLUE}Generating of Debian 'source.lists' file$CEND..."
 	CreatingMySQL_DB="${CBLUE}Creating MySQL databases$CEND..."
 	QStartInstall="How do you want to start the installation ? Type 'manual' or 'auto' ?"
 	StartingScreen="${CBLUE}Starting SCREEN session...$CEND"
@@ -194,7 +193,6 @@ ${CRED}############################################################$CEND"
 	CantWriteConfig="${CRED}Je ne peux pas écrire dans le fichier \"/etc/MySB/config\", abandon !$CEND"
 	LoadingVar="${CBLUE}Chargement des variables et fonctions$CEND..."
 	CreatingDir="${CBLUE}Création des répertoires$CEND..."
-	SourcesDebian="${CBLUE}Génération du fichier 'sources.list' pour Debian$CEND..."
 	CreatingMySQL_DB="${CBLUE}Création des bases de données MySQL$CEND..."
 	QStartInstall="Comment voulez-vous lancer l'installation? Tapez 'manuel' ou 'auto'."
 	StartingScreen="${CBLUE}Démarrage de la session SCREEN...$CEND"
@@ -281,7 +279,7 @@ SystemChecks() {
 
 	nContinue=0
 
-	#### Must be Debian 7 Wheezy (x86_64)
+	#### Must be Debian 8 Jessie
 	if type -P lsb_release > /dev/null; then
 		sOS_Id="`lsb_release -is`"
 		sOS_Ver="`lsb_release -rs | cut -d '.' -f 1`"
@@ -509,11 +507,6 @@ source $MySB_InstallDir/inc/vars
 echo -e -n "$CreatingDir"
 gfnManageDirAndFiles 'global'
 echo -e "$Done"
-
-#### Sources List
-echo -e -n "$SourcesDebian..."
-gfnScriptInvoke 'ScreenWAIT' "$MySB_InstallDir/install/SourcesList" 'BASIC' 'INSTALL'
-gfnStatusSTD
 
 #### Create databases
 echo -e -n "$CreatingMySQL_DB"

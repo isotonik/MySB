@@ -1,11 +1,5 @@
 #### 1 - ALTER some tables - BoF
-# system
-cmdMySQL 'MySB_db' "ALTER TABLE system CHANGE quota_default quota_default BIGINT(32) NOT NULL;" -v
-cmdMySQL 'MySB_db' "ALTER TABLE system ADD ipv4_additional VARCHAR(128) NOT NULL;" -v
-# users
-cmdMySQL 'MySB_db' "ALTER TABLE users CHANGE quota quota BIGINT(32) NOT NULL;" -v
-# users_addresses
-cmdMySQL 'MySB_db' "ALTER TABLE users_addresses ADD imported TINYINT(1) NOT NULL DEFAULT '0';" -v
+
 #### 1 - ALTER some tables - EoF
 
 #### 2 - Import Schema for new tables, triggers & constraints - BoF
@@ -25,13 +19,12 @@ mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $My
 # repositories
 cmdMySQL 'MySB_db' "DELETE FROM repositories;" -v
 mysql --defaults-extra-file=/root/.config.cnf --database=MySB_db --verbose < $MySB_InstallDir/upgrade/repositories.sql
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='ruTorrent';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='ruTorrent Plugin LBLL-Suite';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Composer';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Wget';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='GeoIPupdate';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='libsmbclient-php';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Minisign';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Libsodium';" -v
-cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='NextCloud';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='ruTorrent';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='ruTorrent Plugin LBLL-Suite';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Composer';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='GeoIPupdate';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='libsmbclient-php';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Minisign';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='Libsodium';" -v
+# cmdMySQL 'MySB_db' "UPDATE repositories SET upgrade = '1' WHERE name='NextCloud';" -v
 #### 3 - UPDATE some tables - EoF

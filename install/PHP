@@ -29,7 +29,7 @@ gfnManageServices stop "$binPhpFpm"
 
 #### Install packages
 case "$gsDebianRelease" in
-	'wheezy'|'jessie')
+	'jessie')
 		sPeclModules="smbclient htscanner"
 		sDebModulesWithPecl="php5-geoip php5-imagick php5-redis"
 		gfnPackagesManage purge "$sDebModulesWithPecl"
@@ -48,7 +48,7 @@ esac
 
 #### Configuration files
 case "$gsDebianRelease" in
-	'wheezy'|'jessie')
+	'jessie')
 		# $sPhpDir/fpm/pool.d/www.conf
 		install -v -o root -g root -m 0644 $MySB_InstallDir/templates/php/etc.php5.fpm.pool.d.www.conf.tmpl $sPhpDir/fpm/pool.d/www.conf
 		# $sPhpDir/fpm/php.ini

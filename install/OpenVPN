@@ -83,10 +83,7 @@ CreateServer() {
 	[ ! -d $MySB_InstallDir/web/openvpn ] && mkdir -p $MySB_InstallDir/web/openvpn
 	if [ ! -d /etc/openvpn/easy-rsa ]; then
 		mkdir -pv /etc/openvpn/easy-rsa
-		case "$gsDebianRelease" in
-			'wheezy')			cp -vr /usr/share/doc/openvpn/examples/easy-rsa/2.0/* /etc/openvpn/easy-rsa/;;
-			'jessie'|'stretch')	cp -vr /usr/share/easy-rsa/* /etc/openvpn/easy-rsa/;;
-		esac
+		cp -vr /usr/share/easy-rsa/* /etc/openvpn/easy-rsa/
 		chown -vR $USER /etc/openvpn/easy-rsa/
 	fi
 

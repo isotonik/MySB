@@ -36,10 +36,6 @@ PackagesList_Lib="libtool libxml2-dev libsigc++-2.0-dev libncurses5-dev libcppun
 PackagesList_Backports="subversion"
 
 case "$gsDebianRelease" in
-	'wheezy')
-		PackagesList_Standard="$PackagesList_Standard update-notifier-common python3.2 gnupg-curl"
-		PackagesList_Lib="$PackagesList_Lib libxmlrpc-c3-dev libav-tools libhttp-daemon-ssl-perl"
-	;;
 	'jessie')
 		PackagesList_Standard="$PackagesList_Standard apt-config-auto-update python3.4 gnupg-curl"
 		PackagesList_Lib="$PackagesList_Lib libsystemd-dev"

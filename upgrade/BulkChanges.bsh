@@ -57,28 +57,17 @@ case "$1" in
 		#### To call for every upgrade - EoF
 		####################################
 
-		#### MySQL
-		echo "port = 3306" >> /root/.config.cnf
-		rm -v /etc/mysql/conf.d/*.cnf
-		install -v -o root -g root -m 0600 $MySB_InstallDir/templates/etc.mysql.conf.d.mysb.tmpl /etc/mysql/conf.d/MySB.cnf
-		perl -pi -e "s/^myisam-recover/#myisam-recover/g" /etc/mysql/my.cnf
-		perl -pi -e "s/^log_error/#log_error/g" /etc/mysql/my.cnf		
+		#### Remove old certificates
+		rm -rfv $MySB_InstallDir/ssl/GeoTrust/
+		rm -rfv $MySB_InstallDir/ssl/GoDaddy/
 
-		#### Backup-Manager
-		[ -f /etc/backup-manager.conf ] && rm -vf /etc/backup-manager.conf
-
-		#### MySQL
-		sed -i '/TMPFS - MySQL/d' /etc/fstab
-		sed -i '/\/mnt\/tmpFS\/mysql/d' /etc/fstab
-		sed -i '/mysql/d' /etc/fstab
-		echo "# TMPFS - MySQL" >> /etc/fstab
-		echo "tmpfs   /mnt/tmpFS/mysql      tmpfs   defaults,nosuid,noatime,mode=1777,size=32M 0 0" >> /etc/fstab
-
-		#### Seedbox-Manager
-		gfnListCountUsers 'normal'
+		#### Remove rTorrent incomplete directory
 		for seedUser in $gsUsersList; do
-			[ -f $gsManagerDir/conf/users/$seedUser/config.ini ] && rm -vf $gsManagerDir/conf/users/$seedUser/config.ini
+			rm -rfv /home/$seedUser/rtorrent/incomplete/
 		done
+
+
+
 
 		#### Sync DB
 		for seedUser in $gsUsersList; do

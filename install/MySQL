@@ -128,15 +128,6 @@ if [ "$gsSwitch" != "UPGRADE" ]; then
 	#### STOP services
 	gfnManageServices 'stop' 'mysql'
 
-	#### Force mysql user homedir
-	case "$gsDebianRelease" in
-		'wheezy')
-			if [ -z "`getent passwd mysql | grep '/var/lib/mysql'`" ]; then
-				usermod -d /var/lib/mysql mysql
-			fi
-		;;
-	esac
-
 	#### Logrotate
 	gfnLogRotate 'mysql-server'
 
@@ -146,9 +137,7 @@ if [ "$gsSwitch" != "UPGRADE" ]; then
 fi
 
 #### START services
-case "$gsDebianRelease" in
-	'jessie'|'stretch')	systemctl daemon-reload;;
-esac
+systemctl daemon-reload
 gfnManageServices 'start' 'mysql'
 
 #### MySQL Tuner

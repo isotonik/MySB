@@ -34,6 +34,7 @@ Questions_Category_MainUserInfos="${CYELLOW}#### Informations concernant l'utili
 Questions_Category_ServerInfos="${CYELLOW}#### Informations du serveur ####$CEND"
 Questions_Category_Services="${CYELLOW}#### Services ####$CEND"
 Questions_Category_Security="${CYELLOW}#### Securité ####$CEND"
+Questions_Category_Statistics="${CYELLOW}#### Statistiques ####$CEND"
 
 Questions_NeedSomeInfos="${CGREEN}############################################################$CEND
 ${CGREEN}#$CEND ${CYELLOW}Maintenant, il est nécessaire de répondre à quelques questions.$CEND
@@ -113,6 +114,16 @@ Questions_InstallBlockList_0="'PeerGuardian' OU 'rTorrent' OU '$Global_None' ? "
 Questions_InstallBlockList_1="'rTorrent' OU '$Global_None' ? "
 Questions_InstallDNScrypt="Voulez-vous installer DNScrypt-proxy (recommandé) ? ($Global_YES/$Global_NO) "
 
+Questions_Message_Statistics="${CYELLOW}Voulez-vous me signaler votre installation ?
+Les informations collectées sont:
+1/	Le numéro de version de MySB ($gsCurrentVersion)
+2/	Le pays où se trouve votre serveur
+3/	L'ID de votre serveur (/etc/machine-id)
+Aucune autre information n'est envoyée.
+
+Le but de cette démarche est uniquement de savoir si je dois continuer à me casser le cul à maintenir MySB ;-)$CEND"
+Questions_SendStatistics="Voulez-vous signaler votre installation à toulousain79 ? "
+
 #### SUMMARY
 # MAIN USER INFO
 Summary_Language="${CBLUE}Langue : $CEND"
@@ -151,6 +162,8 @@ Summary_InstallLogWatch="${CBLUE}Installer LogWatch : $CEND"
 Summary_InstallFail2Ban="${CBLUE}Installer Fail2Ban : $CEND"
 Summary_InstallDNScrypt="${CBLUE}Installer DNScrypt-proxy : $CEND"
 Summary_PeerBlock="${CBLUE}Blocage par listes : $CEND"
+#### STATISTICS
+Summary_Statistics="${CBLUE}Statistiques : $CEND"
 # Confirm
 Summary_ConfirmMessage="${CYELLOW}En acceptant, l'installation pourra continuer.
 Dans le cas contraire, vous retournerez au questionnaire.$CEND"

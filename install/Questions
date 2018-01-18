@@ -677,6 +677,23 @@ DisplaySurvey() {
 			esac
 			unset sValue
 		fi
+
+		# Statistics
+		echo
+		echo -e "$Questions_Message_Statistics"
+		if [ "$RepeatSurvey" == "YES" ]; then
+			sValue="$gsStatistics"
+		else
+			sValue="$Global_YES"
+		fi
+		gfnQuestionGetString NO "$Questions_SendStatistics" gsStatistics "$sValue"
+		gsStatistics="`echo $gsStatistics | tr '[:lower:]' '[:upper:]'`"
+
+		case "$gsStatistics" in
+			"$Global_NO")	echo "An uncool user..." > $MySB_InstallDir/statistics;;
+			*)				rm -f $MySB_InstallDir/statistics;;
+		esac
+		unset sValue
 	fi
 
 	if [ "$TYPE" == "INSTALL" ]; then
@@ -798,6 +815,11 @@ ConfirmSurvey() {
 		echo -e "$Summary_InstallDNScrypt" "${CGREEN}$gbToInstall_DNScrypt$CEND"
 		echo -e "$Summary_PeerBlock" "${CGREEN}$gsMySB_PeerBlock$CEND"
 	fi
+
+	#### STATISTICS
+	echo
+	echo -e "$Questions_Category_Statistics"
+	echo -e "$Summary_Statistics" "${CGREEN}$gsStatistics$CEND"
 
 	#### Confirm
 	echo

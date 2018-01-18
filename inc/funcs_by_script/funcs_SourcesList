@@ -38,35 +38,6 @@ gfnDeleteBadSources() {
 
 	# Delete bad sources
 	case "$gsDebianRelease" in
-		'wheezy')
-			sed -i '/debian.advalem.net/d' $sSourcesFile
-			sed -i '/mirrors.e2wsolutions.com/d' $sSourcesFile
-			sed -i '/debian.corenetworks.net/d' $sSourcesFile
-			sed -i '/ftp.informatik.uni-frankfurt.de/d' $sSourcesFile
-			sed -i '/archive.mmu.edu.my/d' $sSourcesFile
-			sed -i '/debian.osdn.org.ua/d' $sSourcesFile
-			sed -i '/ftp.kfki.hu/d' $sSourcesFile
-			sed -i '/mirror.internap.com/d' $sSourcesFile
-			sed -i '/mirrors.serverhost.ro/d' $sSourcesFile
-			sed -i '/ftp.roedu.net/d' $sSourcesFile
-			sed -i '/ftp.debian.nl/d' $sSourcesFile
-			sed -i '/archive.mmu.edu.my/d' $sSourcesFile
-			sed -i '/russell.cs.bilgi.edu.tr/d' $sSourcesFile
-			sed -i '/pubmirrors.dal.corespace.com/d' $sSourcesFile
-			sed -i '/mirror.thelinuxfix.com/d' $sSourcesFile
-			sed -i '/mirrors.xenir.com/d' $sSourcesFile
-			sed -i '/debian.intergenia.de/d' $sSourcesFile
-			sed -i '/debian.mirror.ate.info/d' $sSourcesFile
-			sed -i '/ftp.rezopole.net/d' $sSourcesFile
-			sed -i '/ftp.proxad.net/d' $sSourcesFile
-			sed -i '/debian.bononia.it/d' $sSourcesFile
-			sed -i '/mirror.lwlcom.net/d' $sSourcesFile
-			sed -i '/merlin.fit.vutbr.cz/d' $sSourcesFile
-			sed -i '/mirrors.evowise.com/d' $sSourcesFile
-			sed -i '/ftp.udc.es/d' $sSourcesFile
-			sed -i '/debs.pelotas.ifsul.edu.br/d' $sSourcesFile
-			sed -i '/mirror.sov.uk.goscomb.net/d' $sSourcesFile
-		;;
 		'jessie')
 			sed -i '/debian.bononia.it/d' $sSourcesFile
 			sed -i '/linorg.usp.br/d' $sSourcesFile
@@ -199,9 +170,6 @@ gfnCreateLocalMirror() {
 		# Local mirrors
 		echo "# PlexMedia" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
 		case "$gsDebianRelease" in
-			'wheezy')
-				echo "deb http://shell.ninthgate.se/packages/debian $gsDebianRelease main" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
-			;;
 			'jessie')
 				echo "deb http://shell.ninthgate.se/packages/debian $gsDebianRelease main" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
 				echo "deb http://shell.ninthgate.se/packages/debian plexpass main" >> $MySB_InstallDir/files/apt_mirrors/mirror.list
@@ -211,9 +179,6 @@ gfnCreateLocalMirror() {
 		# plexmedia.list (local)
 		echo "# PlexMedia" > /etc/apt/sources.list.d/plexmedia.list
 		case "$gsDebianRelease" in
-			'wheezy')
-				echo "deb file://$MySB_InstallDir/files/apt_mirrors/mirrors/shell.ninthgate.se/packages/debian $gsDebianRelease main" >> /etc/apt/sources.list.d/plexmedia.list
-			;;
 			'jessie')
 				echo "deb file://$MySB_InstallDir/files/apt_mirrors/mirrors/shell.ninthgate.se/packages/debian $gsDebianRelease main" >> /etc/apt/sources.list.d/plexmedia.list
 				echo "deb file://$MySB_InstallDir/files/apt_mirrors/mirrors/shell.ninthgate.se/packages/debian plexpass main" >> /etc/apt/sources.list.d/plexmedia.list
@@ -262,15 +227,6 @@ CreateDotDebRepo() {
 	echo "deb http://packages.dotdeb.org $gsDebianRelease all" | tee -a /etc/apt/sources.list.d/dotdeb.list
 	echo "deb http://dotdeb.debian.skynet.be $gsDebianRelease all" | tee -a /etc/apt/sources.list.d/dotdeb.list
 
-	case "$gsDebianRelease" in
-		'wheezy')
-			# DotDeb PHP 5.6 with ZTS
-			echo "" | tee -a /etc/apt/sources.list.d/dotdeb.list
-			echo "# DotDeb PHP 5.6" | tee -a /etc/apt/sources.list.d/dotdeb.list
-			echo "deb http://packages.dotdeb.org $gsDebianRelease-php56-zts all" | tee -a /etc/apt/sources.list.d/dotdeb.list
-			echo "deb http://dotdeb.debian.skynet.be $gsDebianRelease-php56-zts all" | tee -a /etc/apt/sources.list.d/dotdeb.list
-		;;
-	esac
 	# DotDeb GPG key
 	if [ ! -f $MySB_InstallDir/files/repos_keys/dotdeb.key ]; then
 		$binCURL -o "$MySB_InstallDir/files/repos_keys/dotdeb.key" "http://www.dotdeb.org/dotdeb.gpg"

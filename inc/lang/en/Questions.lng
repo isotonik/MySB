@@ -34,6 +34,7 @@ Questions_Category_MainUserInfos="${CYELLOW}#### Main User Info ####$CEND"
 Questions_Category_ServerInfos="${CYELLOW}#### Server Info ####$CEND"
 Questions_Category_Services="${CYELLOW}#### Services ####$CEND"
 Questions_Category_Security="${CYELLOW}#### Security ####$CEND"
+Questions_Category_Statistics="${CYELLOW}#### Statistics ####$CEND"
 
 Questions_NeedSomeInfos="${CGREEN}############################################################$CEND
 ${CGREEN}#$CEND ${CYELLOW}Now it is necessary to answer some questions.$CEND
@@ -111,8 +112,17 @@ Questions_Message_Blocklists_0="${CYELLOW}Your system have ${CRED}$gsMemory$CEND
 Questions_Message_Blocklists_1="${CYELLOW}Your system have ${CRED}$gsMemory$CEND ${CYELLOW}MB of RAM. You can choose between PeerGuardian and rTorrent.$CEND"
 Questions_InstallBlockList_0="'PeerGuardian' OR 'rTorrent' OR '$Global_None' ? "
 Questions_InstallBlockList_1="'rTorrent' OR '$Global_None' ? "
-Questions_InstallBlockList="'PeerGuardian' OR 'rTorrent' OR '$Global_None' ? "
 Questions_InstallDNScrypt="Do you want to install DNScrypt-proxy (recommended) ? ($Global_YES/$Global_NO) "
+
+Questions_Message_Statistics="${CYELLOW}Would you like to report me your installation ?
+The informations collected are:
+1/	The version number of MySB ($gsCurrentVersion)
+2/	The country where your server is located
+3/	The ID of your server (/etc/machine-id)
+No other information is sent.
+
+The purpose of this step is only to know if I should continue to break my ass to maintain MySB ;-)$CEND"
+Questions_SendStatistics="Do you want to report your installation to toulousain79 ? "
 
 #### SUMMARY
 # MAIN USER INFO
@@ -152,6 +162,8 @@ Summary_InstallLogWatch="${CBLUE}Install LogWatch : $CEND"
 Summary_InstallFail2Ban="${CBLUE}Install Fail2Ban : $CEND"
 Summary_InstallDNScrypt="${CBLUE}Install DNScrypt-proxy : $CEND"
 Summary_PeerBlock="${CBLUE}Blocking with blacklists : $CEND"
+#### STATISTICS
+Summary_Statistics="${CBLUE}Statistics : $CEND"
 # Confirm
 Summary_ConfirmMessage="${CYELLOW}By accepting, the installation will continue.
 Otherwise, you return to the questionnaire.$CEND"

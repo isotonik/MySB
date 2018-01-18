@@ -45,29 +45,6 @@ if [ ! -d $GoDaddyDir ]; then mkdir $GoDaddyDir; fi
 
 #### GeoTrust - Active Roots - BoF
 ### https://www.geotrust.com/au/resources/root-certificates/#
-# GeoTrust Primary Certification Authority
-# if [ ! -f $GeoTrustDir/GeoTrust_Primary_CA.pem ]; then
-	# $binCURL -o "$GeoTrustDir/GeoTrust_Primary_CA.pem" "$GeoTrustUrl/GeoTrust_Primary_CA.pem"
-# fi
-# if [ -f $GeoTrustDir/GeoTrust_Primary_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Primary_CA.pem ]; then
-	# ln -sv $GeoTrustDir/GeoTrust_Primary_CA.pem $CertsDir/GeoTrust_Primary_CA.pem
-# fi
-
-# GeoTrust Primary Certification Authority - G2
-# if [ ! -f $GeoTrustDir/GeoTrust_Primary_CA_G2_ECC.pem ]; then
-	# $binCURL -o "$GeoTrustDir/GeoTrust_Primary_CA_G2_ECC.pem" "$GeoTrustUrl/GeoTrust_Primary_CA_G2_ECC.pem"
-# fi
-# if [ -f $GeoTrustDir/GeoTrust_Primary_CA_G2_ECC.pem ] && [ ! -h $CertsDir/GeoTrust_Primary_CA_G2_ECC.pem ]; then
-	# ln -sv $GeoTrustDir/GeoTrust_Primary_CA_G2_ECC.pem $CertsDir/GeoTrust_Primary_CA_G2_ECC.pem
-# fi
-
-# GeoTrust Primary Certification Authority - G3
-# if [ ! -f $GeoTrustDir/Geotrust_PCA_G3_Root.pem ]; then
-	# $binCURL -o "$GeoTrustDir/Geotrust_PCA_G3_Root.pem" "$GeoTrustUrl/Geotrust_PCA_G3_Root.pem"
-# fi
-# if [ -f $GeoTrustDir/Geotrust_PCA_G3_Root.pem ] && [ ! -h $CertsDir/Geotrust_PCA_G3_Root.pem ]; then
-	# ln -sv $GeoTrustDir/Geotrust_PCA_G3_Root.pem $CertsDir/Geotrust_PCA_G3_Root.pem
-# fi
 
 # GeoTrust Primary Certification Authority - G4
 if [ ! -f $GeoTrustDir/GeoTrust_Primary_CA_G4_DSA.pem ]; then
@@ -77,22 +54,6 @@ if [ -f $GeoTrustDir/GeoTrust_Primary_CA_G4_DSA.pem ] && [ ! -h $CertsDir/GeoTru
 	ln -sv $GeoTrustDir/GeoTrust_Primary_CA_G4_DSA.pem $CertsDir/GeoTrust_Primary_CA_G4_DSA.pem
 fi
 
-# GeoTrust Universal CA
-# if [ ! -f $GeoTrustDir/GeoTrust_Universal_CA.pem ]; then
-	# $binCURL -o "$GeoTrustDir/GeoTrust_Universal_CA.pem" "$GeoTrustUrl/GeoTrust_Universal_CA.pem"
-# fi
-# if [ -f $GeoTrustDir/GeoTrust_Universal_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Universal_CA.pem ]; then
-	# ln -sv $GeoTrustDir/GeoTrust_Universal_CA.pem $CertsDir/GeoTrust_Universal_CA.pem
-# fi
-
-# GeoTrust Universal CA 2
-# if [ ! -f $GeoTrustDir/GeoTrust_Universal_CA2.pem ]; then
-	# $binCURL -o "$GeoTrustDir/GeoTrust_Universal_CA2.pem" "$GeoTrustUrl/GeoTrust_Universal_CA2.pem"
-# fi
-# if [ -f $GeoTrustDir/GeoTrust_Universal_CA2.pem ] && [ ! -h $CertsDir/GeoTrust_Universal_CA2.pem ]; then
-	# ln -sv $GeoTrustDir/GeoTrust_Universal_CA2.pem $CertsDir/GeoTrust_Universal_CA2.pem
-# fi
-
 # GeoTrust Global CA
 if [ ! -f $GeoTrustDir/GeoTrust_Global_CA.pem ]; then
 	$binCURL -o "$GeoTrustDir/GeoTrust_Global_CA.pem" "$GeoTrustUrl/GeoTrust_Global_CA.pem"
@@ -100,14 +61,6 @@ fi
 if [ -f $GeoTrustDir/GeoTrust_Global_CA.pem ] && [ ! -h $CertsDir/GeoTrust_Global_CA.pem ]; then
 	ln -sv $GeoTrustDir/GeoTrust_Global_CA.pem $CertsDir/GeoTrust_Global_CA.pem
 fi
-
-# GeoTrust Global CA 2
-# if [ ! -f $GeoTrustDir/GeoTrust_Global_CA2.pem ]; then
-	# $binCURL -o "$GeoTrustDir/GeoTrust_Global_CA2.pem" "$GeoTrustUrl/GeoTrust_Global_CA2.pem"
-# fi
-# if [ -f $GeoTrustDir/GeoTrust_Global_CA2.pem ] && [ ! -h $CertsDir/GeoTrust_Global_CA2.pem ]; then
-	# ln -sv $GeoTrustDir/GeoTrust_Global_CA2.pem $CertsDir/GeoTrust_Global_CA2.pem
-# fi
 #### GeoTrust - Active Roots - EoF
 
 #### GeoTrust - Retired Roots - BoF
@@ -131,21 +84,6 @@ fi
 
 #### GoDaddy - Active Roots - BoF
 ### https://certs.godaddy.com/repository
-# class 2 root
-# if [ ! -f $GoDaddyDir/gd-class2-root.crt ]; then
-	# $binCURL -o "$GoDaddyDir/gd-class2-root.crt" "$GoDaddyUrl/gd-class2-root.crt"
-# fi
-# if [ -f $GoDaddyDir/gd-class2-root.crt ] && [ ! -h $CertsDir/gd-class2-root.crt ]; then
-	# ln -sv $GoDaddyDir/gd-class2-root.crt $CertsDir/gd-class2-root.crt
-# fi
-
-# intermediate
-# if [ ! -f $GoDaddyDir/gd_intermediate.pem ]; then
-	# $binCURL -o "$GoDaddyDir/gd_intermediate.pem" "$GoDaddyUrl/gd_intermediate.pem"
-# fi
-# if [ -f $GoDaddyDir/gd_intermediate.pem ] && [ ! -h $CertsDir/gd_intermediate.pem ]; then
-	# ln -sv $GoDaddyDir/gd_intermediate.pem $CertsDir/gd_intermediate.pem
-# fi
 
 # cross_intermediate
 if [ ! -f $GoDaddyDir/gd_cross_intermediate.crt ]; then

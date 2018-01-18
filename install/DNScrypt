@@ -45,7 +45,6 @@ gnDNScryptUpgrade=0
 if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 	# Check packages to install
 	case "$gsDebianRelease" in
-		'wheezy')	Packages='ldnsutils libldns-dev rng-tools haveged';;
 		'jessie')	Packages='ldnsutils libldns-dev rng-tools haveged libsodium-dev';;
 	esac
 	gfnPackageBundleInstall "$Packages"
@@ -111,7 +110,6 @@ if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 		chmod -v +x autogen.sh
 		./autogen.sh
 		case "$gsDebianRelease" in
-			'wheezy')			./configure --with-gnu-ld --enable-ltdl-install;;
 			'jessie'|'stretch')	./configure --with-gnu-ld --enable-ltdl-install --with-systemd;;
 		esac
 		make -j$gsProcessors

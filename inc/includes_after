@@ -77,7 +77,7 @@ case "$gsScriptName" in
 			# No credentials are retained !
 			# The server IP is only used to know the country of the SeedBox.
 			if [ ! -z "$gbDevMode" ] && [ $gbDevMode -eq 0 ]; then
-				if [ -f /etc/machine-id ]; then
+				if [ -f /etc/machine-id ] && [ ! -f $MySB_InstallDir/statistics ]; then
 					gsMachineId="`cat /etc/machine-id`"
 					[ ! -z "$gsMachineId" ] && gsResult="`curl --silent --retry 2 -A 'MySB' --data "version=$gsCurrentVersion&machine_id=$gsMachineId" http://mysb.is-by.us/statistics/`"
 					[ ! -z "`echo $gsResult | grep 'Statistics updated at'`" ] && echo "$gsResult" > $MySB_InstallDir/statistics
