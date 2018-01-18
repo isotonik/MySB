@@ -34,12 +34,11 @@ if [ $? -gt 0 ]; then
 fi
 StatusLSB
 
-#### change working directory
-cd $MySB_InstallDir/
-
 #### update Git Hub
 echo
-git stash
+cd $MySB_InstallDir/
+git fetch origin
+git reset --hard origin/$MySB_CurrentVersion
 git pull
 echo
 
