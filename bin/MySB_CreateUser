@@ -100,7 +100,7 @@ gfnStatusLSB
 
 #### create system user
 log_daemon_msg "$CreateUser_SystemAccount [$UserToCreate]"
-useradd -c "MySB user $UserToCreate" -d $NewUserHomedir -s /bin/bash $UserToCreate 2>&1 | gfnGlobalLogCatching
+useradd -c "MySB user $UserToCreate" -d $NewUserHomedir -s /bin/bash $UserToCreate &> /dev/null
 gfnStatusLSB
 
 case "$UserAccountType" in
@@ -134,9 +134,9 @@ case "$UserAccountType" in
 
 		#### add to groups
 		log_daemon_msg "$CreateUser_AssignGroup [$UserToCreate]"
-		addgroup $UserToCreate MySB_users 2>&1 | gfnGlobalLogCatching
-		[ "$UserSUDO" == "YES" ] && addgroup $UserToCreate sudo 2>&1 | gfnGlobalLogCatching
-		[ "$UserSFTP" == "YES" ] && addgroup $UserToCreate sshdusers 2>&1 | gfnGlobalLogCatching
+		addgroup $UserToCreate MySB_users &> /dev/null
+		[ "$UserSUDO" == "YES" ] && addgroup $UserToCreate sudo &> /dev/null
+		[ "$UserSFTP" == "YES" ] && addgroup $UserToCreate sshdusers &> /dev/null
 		gfnStatusLSB
 
 		#### custumize profile

@@ -44,9 +44,7 @@ gnDNScryptUpgrade=0
 
 if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 	# Check packages to install
-	case "$gsDebianRelease" in
-		'jessie')	Packages='ldnsutils libldns-dev rng-tools haveged libsodium-dev';;
-	esac
+	Packages='ldnsutils libldns-dev rng-tools haveged libsodium-dev'
 	gfnPackageBundleInstall "$Packages"
 
 	# STOP services
@@ -109,9 +107,7 @@ if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 		make clean
 		chmod -v +x autogen.sh
 		./autogen.sh
-		case "$gsDebianRelease" in
-			'jessie'|'stretch')	./configure --with-gnu-ld --enable-ltdl-install --with-systemd;;
-		esac
+		./configure --with-gnu-ld --enable-ltdl-install --with-systemd
 		make -j$gsProcessors
 		make check
 		make install
@@ -121,9 +117,7 @@ if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 
 	#### DNScrypt-proxy - /etc/init.d/dnscrypt-proxy
 	install -v -o root -g root -m 0755 $MySB_InstallDir/templates/init/etc.init.d.dnscrypt-proxy.tmpl /etc/init.d/dnscrypt-proxy
-	case "$gsDebianRelease" in
-		'jessie'|'stretch')	systemctl daemon-reload;;
-	esac
+	systemctl daemon-reload
 
 	# Mark as installed
 	if gfnCheckCommand 0 dnscrypt-proxy; then

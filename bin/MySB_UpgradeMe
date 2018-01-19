@@ -31,10 +31,10 @@ Error=""
 
 #### Updating clock
 echo -e -n "${CBLUE}$UpgradeMe_Clock$CEND..."
-ping -c3 0.fr.pool.ntp.org 2>&1 | gfnGlobalLogCatching
+ping -c3 0.fr.pool.ntp.org > /dev/null 2>&1
 [ $? -gt 0 ] && gfnSwitchDNS "bind"
 
-/usr/sbin/ntpdate -u 0.fr.pool.ntp.org 2>&1 | gfnGlobalLogCatching
+/usr/sbin/ntpdate -u 0.fr.pool.ntp.org > /dev/null 2>&1
 if [ $? -eq 0 ]; then
 	echo -e "$Global_Done"
 else
@@ -46,7 +46,7 @@ fi
 #### Check GitHub accessibility
 if [ $Continue -eq 0 ]; then
 	echo -e -n "${CBLUE}$UpgradeMe_GitHubAccess$CEND..."
-	ping -c3 raw.githubusercontent.com 2>&1 | gfnGlobalLogCatching
+	ping -c3 raw.githubusercontent.com > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
 		echo -e "$Global_Done"
 	else
@@ -69,7 +69,7 @@ if [ $Continue -eq 0 ]; then
 		MySB_NewVersion="`cat $MySB_InstallDir/dev`"
 	else
 		#### Check if new version
-		MySB_NewVersion="`curl -skLS --retry 3 --silent https://raw.githubusercontent.com/toulousain79/MySB/rev/version | grep "$gsCurrentVersion>" | cut -d ">" -f 2 2> | gfnGlobalLogCatching`"
+		MySB_NewVersion="`curl -skLS --retry 3 --silent https://raw.githubusercontent.com/toulousain79/MySB/rev/version | grep "$gsCurrentVersion>" | cut -d ">" -f 2 2> /dev/null`"
 		[ -z "$MySB_NewVersion" ] && MySB_NewVersion="`cat $MySB_InstallDir/version`"
 	fi
 

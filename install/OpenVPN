@@ -101,9 +101,7 @@ CreateServer() {
 	export KEY_OU="MySB OpenVPN Server"
 
 	#### Create server
-	case "$gsDebianRelease" in
-		'jessie'|'stretch')	sed -i 's/KEY_ALTNAMES="\$KEY_CN"/KEY_ALTNAMES="DNS:\${KEY_CN}"/g' ./pkitool;;
-	esac
+	sed -i 's/KEY_ALTNAMES="\$KEY_CN"/KEY_ALTNAMES="DNS:\${KEY_CN}"/g' ./pkitool
 	./clean-all
 	./build-dh
 	./pkitool --initca

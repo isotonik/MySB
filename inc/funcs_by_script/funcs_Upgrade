@@ -31,7 +31,7 @@ gfnUpgradeInProgress() {
 	case "$1" in
 		"on")
 			# Nextcloud
-			[ "$gbIsInstalled_NextCloud" == "YES" ] && su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" 2>&1 | gfnGlobalLogCatching
+			[ "$gbIsInstalled_NextCloud" == "YES" ] && su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" &> /dev/null
 			# rTorrent sessions
 			sRtorrentSessions="`ls -1r /etc/init.d/rtorrent-* | cut -d '/' -f 4`"
 			for sSession in $sRtorrentSessions; do
