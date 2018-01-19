@@ -79,10 +79,10 @@ gfnStatusLSB
 log_daemon_msg "$DeleteUser_DeleteFTP [$UserToDelete]"
 sed -i '/'$UserToDelete'/d' /etc/vsftpd.chroot_list
 if [ ! -z "`df -H 2> /dev/null | grep "/home/$UserToDelete/rtorrent/share"`" ]; then
-	umount /home/$UserToDelete/rtorrent/share 2>&1 | gfnGeneralLogCatching
+	umount /home/$UserToDelete/rtorrent/share &> /dev/null
 fi
 if [ ! -z "`df -H 2> /dev/null | grep "/home/$UserToDelete/rtorrent/torrents"`" ]; then
-	umount /home/$UserToDelete/rtorrent/torrents 2>&1 | gfnGeneralLogCatching
+	umount /home/$UserToDelete/rtorrent/torrents &> /dev/null
 fi
 gfnStatusLSB 0
 
@@ -94,20 +94,20 @@ gfnStatusLSB
 #### Samba
 if [ "$UserAccountType" == "normal" ]; then
 	log_daemon_msg "$DeleteUser_DeleteSamba [$UserToDelete]"
-	smbpasswd -x $UserToDelete 2>&1 | gfnGeneralLogCatching
+	smbpasswd -x $UserToDelete &> /dev/null
 	gfnStatusLSB
 fi
 
 #### NginX - remove current password from htpassword
 log_daemon_msg "$DeleteUser_DeleteWebAccount [$UserToDelete]"
-htpasswd -D /etc/nginx/passwd/MySB $UserToDelete 2>&1 | gfnGeneralLogCatching
+htpasswd -D /etc/nginx/passwd/MySB $UserToDelete &> /dev/null
 rm -f /etc/nginx/passwd/MySB_$UserToDelete
 gfnStatusLSB
 
 #### NextCloud
 if [ "$gbIsInstalled_NextCloud" == "YES" ]; then
 	log_daemon_msg "$DeleteUser_DeleteNextCloudAccount [$UserToDelete]"
-	su -s /bin/sh www-data -c "/usr/bin/php  $gsNextCloudDir/occ user:delete $UserToDelete" 2>&1 | gfnGeneralLogCatching
+	su -s /bin/sh www-data -c "/usr/bin/php  $gsNextCloudDir/occ user:delete $UserToDelete" &> /dev/null
 	cmdMySQL 'NextCloud_db' "DELETE FROM nc_storages WHERE id='local::/home/$UserToDelete/';"
 	cmdMySQL 'NextCloud_db' "DELETE FROM nc_preferences WHERE configkey='/Home_$UserToDelete';"
 	if [ -d /home/nextcloud/$UserToDelete ]; then
@@ -118,7 +118,7 @@ fi
 
 #### remove files
 log_daemon_msg "$DeleteUser_RemoveFiles [$UserToDelete]"
-update-rc.d rtorrent-$UserToDelete remove -f 2>&1 | gfnGeneralLogCatching
+update-rc.d rtorrent-$UserToDelete remove -f &> /dev/null
 if [ -f /etc/init.d/rtorrent-$UserToDelete ]; then
 	rm -f /etc/init.d/rtorrent-$UserToDelete
 fi
@@ -149,7 +149,7 @@ gfnStatusLSB
 
 #### system user
 log_daemon_msg "$DeleteUser_SystemAccount [$UserToDelete]"
-userdel --remove --force $UserToDelete 2>&1 | gfnGeneralLogCatching
+userdel --remove --force $UserToDelete &> /dev/null
 gfnDeleteDirectory 0 "/home/$UserToDelete"
 gfnDeleteDirectory 0 "/var/run/screen/S-$UserToDelete"
 gfnStatusLSB

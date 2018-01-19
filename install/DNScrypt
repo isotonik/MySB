@@ -62,7 +62,7 @@ if [ "$gbToInstall_DNScrypt" == "YES" ]; then
 	gfnSwitchDNS "bind"
 
 	# Upating clock
-	/usr/sbin/ntpdate -u 0.fr.pool.ntp.org
+	/usr/sbin/ntpdate -u 0.fr.pool.ntp.org > /dev/null 2>&1
 
 	if [ "$gsSwitch" == "INSTALL" ]; then
 		#### Add dnscrypt user

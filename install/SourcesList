@@ -101,7 +101,7 @@ else
 			[ -f $MySB_InstallDir/temp/sources.list ] && mv -v $MySB_InstallDir/temp/sources.list /etc/apt/sources.list
 		fi
 
-		rm -fv $MySB_InstallDir/temp/sources.list*
+		rm -v $MySB_InstallDir/temp/sources.list* &> /dev/null
 	else
 		gfnCreateBasicSourcesList
 	fi

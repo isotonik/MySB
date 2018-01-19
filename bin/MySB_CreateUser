@@ -104,7 +104,7 @@ gfnStatusLSB
 
 #### create system user
 log_daemon_msg "$CreateUser_SystemAccount [$UserToCreate]"
-useradd -c "MySB user $UserToCreate" -d $NewUserHomedir -s /bin/bash $UserToCreate 2>&1 | gfnGeneralLogCatching
+useradd -c "MySB user $UserToCreate" -d $NewUserHomedir -s /bin/bash $UserToCreate &> /dev/null
 gfnStatusLSB
 
 case "$UserAccountType" in
@@ -138,13 +138,13 @@ case "$UserAccountType" in
 
 		#### add to groups
 		log_daemon_msg "$CreateUser_AssignGroup [$UserToCreate]"
-		addgroup $UserToCreate MySB_users 2>&1 | gfnGeneralLogCatching
+		addgroup $UserToCreate MySB_users &> /dev/null
 
 		if [ "$UserSUDO" == "YES" ]; then
-			addgroup $UserToCreate sudo 2>&1 | gfnGeneralLogCatching
+			addgroup $UserToCreate sudo &> /dev/null
 		fi
 		if [ "$UserSFTP" == "YES" ]; then
-			addgroup $UserToCreate sshdusers 2>&1 | gfnGeneralLogCatching
+			addgroup $UserToCreate sshdusers &> /dev/null
 		fi
 		gfnStatusLSB
 
@@ -234,7 +234,9 @@ case "$UserAccountType" in
 		log_daemon_msg "$CreateUser_rTorrentInit [$UserToCreate]"
 		install -o root -g root -m 0755 $MySB_InstallDir/templates/init/etc.init.d.rtorrent.tmpl /etc/init.d/rtorrent-$UserToCreate
 		perl -pi -e "s/<username>/$UserToCreate/g" /etc/init.d/rtorrent-$UserToCreate
-		systemctl daemon-reload
+		case "$gsDebianRelease" in
+			'jessie'|'stretch')	systemctl daemon-reload;;
+		esac
 		gfnStatusLSB
 
 		#### cron
@@ -273,7 +275,7 @@ case "$UserAccountType" in
 			fi
 
 			# rTorrent restart
-			service cron status 2>&1 | gfnGeneralLogCatching
+			service cron status &> /dev/null
 			[ $? -eq 0 ] && bToRestart=1
 			if [ "$bToRestart" -eq 1 ] && [ -f /etc/init.d/rtorrent-$seedUser ]; then
 				ServicesToRestart="${ServicesToRestart} rtorrent-$seedUser"

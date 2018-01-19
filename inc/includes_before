@@ -79,7 +79,7 @@ case "$gsScriptName" in
 		echo
 		echo -e "$Upgrade_Banner" | sed 's/screen -x MySB_Upgrade/screen -x $sScreenId/g;'
 		echo
-		gfnLogRotate 'mysb' 1 2>&1 | gfnGeneralLogCatching
+		gfnLogRotate 'mysb' 1 &> /dev/null
 	;;
 esac
 

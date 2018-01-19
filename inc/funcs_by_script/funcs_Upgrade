@@ -32,7 +32,7 @@ gfnUpgradeInProgress() {
 		"on")
 			# Nextcloud
 			if [ "$gbIsInstalled_NextCloud" == "YES" ]; then
-				su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" 2>&1 | gfnGeneralLogCatching
+				su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" &> /dev/null
 			fi
 			# rTorrent sessions
 			sRtorrentSessions="`ls -1r /etc/init.d/rtorrent-* | cut -d '/' -f 4`"

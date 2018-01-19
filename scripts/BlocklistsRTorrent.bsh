@@ -30,7 +30,7 @@ log_daemon_msg "$DeleteGlobalBlocklist"
 if [ ! -d $MySB_InstallDir/files/blocklists ]; then
 	mkdir $MySB_InstallDir/files/blocklists
 else
-	rm -f $MySB_InstallDir/files/blocklists/*
+	rm -f $MySB_InstallDir/files/blocklists/* &> /dev/null
 fi
 gfnStatusLSB
 
@@ -45,7 +45,7 @@ cmdMySQL 'MySB_db' "SELECT author, list_name, rtorrent_list FROM blocklists WHER
 
 	if [ ! -z "$FILE" ] && [ ! -z "$URL" ]; then
 		log_daemon_msg "$DownloadSelectedList" "$Author - $ListName"
-		gfnCleanBlockList download "$FILE" "$URL" "$ListNameToParse" 2>&1 | gfnGeneralLogCatching
+		gfnCleanBlockList download "$FILE" "$URL" "$ListNameToParse" &> /dev/null
 
 		# complete global list
 		if [ -f $MySB_InstallDir/files/blocklists/$FILE.txt ]; then

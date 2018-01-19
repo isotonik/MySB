@@ -45,7 +45,7 @@ gfnPeerGuardianFailed() {
 					perl -pi -e "s/^#ipv4_filter.load/ipv4_filter.load/g" /home/$sUser/.rtorrent.rc
 					perl -pi -e "s/^#print/print/g" /home/$sUser/.rtorrent.rc
 
-					service rtorrent-$sUser status 2>&1 | gfnGeneralLogCatching
+					service rtorrent-$sUser status &> /dev/null
 					if [ $? -eq 0 ]; then
 						gfnStatusLSB 0
 						service rtorrent-$sUser restart
@@ -63,7 +63,7 @@ gfnPeerGuardianFailed() {
 						perl -pi -e "s/^ipv4_filter.load/#ipv4_filter.load/g" /home/$sUser/.rtorrent.rc
 						perl -pi -e "s/^print/#print/g" /home/$sUser/.rtorrent.rc
 
-						service rtorrent-$sUser status 2>&1 | gfnGeneralLogCatching
+						service rtorrent-$sUser status &> /dev/null
 						if [ $? -eq 0 ]; then
 							gfnStatusLSB 0
 							service rtorrent-$sUser restart
