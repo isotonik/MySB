@@ -96,16 +96,16 @@ fi
 
 #### Disable some init, they will start by MySB_SecurityRules
 if [ -f /etc/init.d/fail2ban ]; then
-	update-rc.d fail2ban remove -f &> /dev/null 2>&1
+	update-rc.d fail2ban remove -f 2>&1 | gfnGeneralLogCatching
 fi
 if [ -f /etc/init.d/bind9 ]; then
-	update-rc.d bind9 remove -f &> /dev/null
+	update-rc.d bind9 remove -f 2>&1 | gfnGeneralLogCatching
 fi
 if [ -f /etc/init.d/dnscrypt-proxy ]; then
-	update-rc.d dnscrypt-proxy remove -f &> /dev/null
+	update-rc.d dnscrypt-proxy remove -f 2>&1 | gfnGeneralLogCatching
 fi
 if [ -f /etc/init.d/pgl ]; then
-	update-rc.d pgl remove -f &> /dev/null
+	update-rc.d pgl remove -f 2>&1 | gfnGeneralLogCatching
 fi
 
 update-ca-certificates --verbose --fresh

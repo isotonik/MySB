@@ -221,7 +221,7 @@ gfnCreateBasicSourcesList() {
 #### DotDeb Mirrors
 CreateDotDebRepo() {
 	# Remove current lists
-	rm -f /etc/apt/sources.list.d/dotdeb*.list &> /dev/null
+	rm -f /etc/apt/sources.list.d/dotdeb*.list 2>&1 | gfnGeneralLogCatching
 	# DotDeb
 	echo "# DotDeb" | tee -a /etc/apt/sources.list.d/dotdeb.list
 	echo "deb http://packages.dotdeb.org $gsDebianRelease all" | tee -a /etc/apt/sources.list.d/dotdeb.list

@@ -262,7 +262,7 @@ RestartRtorrentSessions() {
 				if [ -f /etc/init.d/rtorrent-$FnUser ]; then
 					rTorrentToStop="${rTorrentToStop} rtorrent-$FnUser"
 					bToRestart="`cmdMySQL 'MySB_db' "SELECT rtorrent_restart FROM users WHERE users_ident='$FnUser';"`"
-					service rtorrent-$FnUser status &> /dev/null
+					service rtorrent-$FnUser status 2>&1 | gfnGeneralLogCatching
 					[ $? -eq 0 ] && bToRestart=1
 					cmdMySQL 'MySB_db' "UPDATE users SET rtorrent_restart='$bToRestart' WHERE users_ident='$FnUser';"
 				fi
@@ -270,7 +270,7 @@ RestartRtorrentSessions() {
 		;;
 		start)
 			for FnUser in $gsUsersList; do
-				service cron status &> /dev/null
+				service cron status 2>&1 | gfnGeneralLogCatching
 				[ $? -eq 0 ] && bCreateAfterClean=1 || bCreateAfterClean="`cmdMySQL 'MySB_db' "SELECT rtorrent_restart FROM users WHERE users_ident='$FnUser' AND is_active='1';"`"
 
 				if [ "$bCreateAfterClean" -eq 1 ] && [ -f /etc/init.d/rtorrent-$FnUser ]; then

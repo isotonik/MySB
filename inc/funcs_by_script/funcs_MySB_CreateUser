@@ -37,7 +37,7 @@ gfnNextCloudAccountManage() {
 
 	case "$sSwitch" in
 		'create')
-			su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:add --password-from-env --display-name=\"$sUserAccount\" --group=\"MySB_users\" $sUserAccount" &> /dev/null
+			su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:add --password-from-env --display-name=\"$sUserAccount\" --group=\"MySB_users\" $sUserAccount" 2>&1 | gfnGeneralLogCatching
 			#cmdMySQL 'NextCloud_db' "INSERT INTO nc_preferences (userid,appid,configkey,configvalue) VALUES ('admin','files_external','/Home_$sUserAccount','$tTimeStamp');"
 			IfExist="`cmdMySQL 'NextCloud_db' "SELECT configvalue FROM nc_preferences WHERE userid='$sUserAccount' AND appid='core' AND configkey = 'lang';"`"
 			if [ -z "$IfExist" ]; then
@@ -59,7 +59,7 @@ gfnNextCloudAccountManage() {
 			fi
 		;;
 		'edit')
-			su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:resetpassword --password-from-env $sUserAccount" &> /dev/null
+			su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:resetpassword --password-from-env $sUserAccount" 2>&1 | gfnGeneralLogCatching
 		;;
 	esac
 }
@@ -218,7 +218,7 @@ gfnManageUserHomeDir() {
 	# /home/user/rtorrent/watch
 	chown root:$sUser /home/$sUser/rtorrent/watch
 	chmod 0775 /home/$sUser/rtorrent/watch
-	chown $sUser:www-data /home/$sUser/rtorrent/watch/* 2&> /dev/null
+	chown $sUser:www-data /home/$sUser/rtorrent/watch/* 2>&1 | gfnGeneralLogCatching
 	# /home/user/rtorrent/complete
 	chown root:$sUser /home/$sUser/rtorrent/complete
 	chmod 0775 /home/$sUser/rtorrent/complete
@@ -403,7 +403,7 @@ gfnUserCrontab() {
 	fi
 	if [ -f $sHomeDir/scripts/crontab ]; then
 		crontab -u $sUser $sHomeDir/scripts/crontab
-		service cron restart &> /dev/null
+		service cron restart 2>&1 | gfnGeneralLogCatching
 		rm -f $sHomeDir/scripts/crontab
 	fi
 }
@@ -488,7 +488,7 @@ gfnCreateRtorrentConfigFile() {
 	echo "$Global_Readme_AvailableVariables" > /home/$sUser/scripts/README
 	chown $sUser:$sUser /home/$sUser/scripts/*
 	chmod 0770 /home/$sUser/scripts/*
-	dos2unix /home/$sUser/scripts/* &> /dev/null
+	dos2unix /home/$sUser/scripts/* 2>&1 | gfnGeneralLogCatching
 
 	if [ $bCreateNewFile -eq 1 ]; then
 		# .rtorrent.rc

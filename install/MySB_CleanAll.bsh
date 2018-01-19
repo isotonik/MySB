@@ -105,7 +105,7 @@ EOF
 
 #### Remove system account for all users
 for seedUser in $gsUsersList; do
-	userdel --remove --force $seedUser &> /dev/null
+	userdel --remove --force $seedUser 2>&1 | gfnGeneralLogCatching
 	if [ -d /home/$seedUser ]; then rm -rf /home/$seedUser; fi
 	if [ -d /var/run/screen/S-$seedUser ]; then rm -rf /var/run/screen/S-$seedUser; fi
 done
@@ -134,19 +134,19 @@ gfnPackagesManage purge "$ToRemove"
 
 #### Delete files and directories
 rm -f /etc/init.d/rtorrent-*
-rm -f /etc/apt/sources.list.d/* &> /dev/null
-if [ -f /etc/init.d/dnscrypt-proxy ]; then rm -f /etc/init.d/dnscrypt-proxy; fi
-if [ -f /var/log/dnscrypt-proxy.log ]; then rm -f /var/log/dnscrypt-proxy.log; fi
-if [ -f /var/log/vsftpd.log ]; then rm -f /var/log/vsftpd.log; fi
-if [ -d /run/dnscrypt-proxy ]; then rm -rf /run/dnscrypt-proxy; fi
-if [ -d /etc/stunnel ]; then rm -rf /etc/stunnel; fi
-if [ -d /usr/share/webmin ]; then rm -rf /usr/share/webmin; fi
-if [ -d /var/lib/pgl ]; then rm -rf /var/lib/pgl; fi
-if [ -d /var/log/pgl ]; then rm -rf /var/log/pgl; fi
-if [ -d /var/log/nginx ]; then rm -rf /var/log/nginx; fi
-if [ -d /var/log/openvpn ]; then rm -rf /var/log/openvpn; fi
-if [ -d /var/log/samba ]; then rm -rf /var/log/samba; fi
-if [ -d $MySB_InstallDir ]; then rm -rf $MySB_InstallDir; fi
+rm -f /etc/apt/sources.list.d/*
+rm -f /etc/init.d/dnscrypt-proxy
+rm -f /var/log/dnscrypt-proxy.log
+rm -f /var/log/vsftpd.log
+rm -rf /run/dnscrypt-proxy
+rm -rf /etc/stunnel
+rm -rf /usr/share/webmin
+rm -rf /var/lib/pgl
+rm -rf /var/log/pgl
+rm -rf /var/log/nginx
+rm -rf /var/log/openvpn
+rm -rf /var/log/samba
+rm -rf $MySB_InstallDir
 
 # -----------------------------------------
 if [ -f $(dirname $0)/../inc/includes_after ]; then source $(dirname $0)/../inc/includes_after; fi

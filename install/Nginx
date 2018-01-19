@@ -44,8 +44,8 @@ if [ ! -d /etc/nginx/locations ]; then mkdir -v /etc/nginx/locations; fi
 if [ ! -d /etc/nginx/rpc ]; then mkdir -v /etc/nginx/rpc; fi
 if [ ! -d /etc/nginx/proxy ]; then mkdir -v /etc/nginx/proxy; fi
 if [ ! -d /etc/nginx/upstream ]; then mkdir -v /etc/nginx/upstream; fi
-rm -f /etc/nginx/locations/* &> /dev/null
-rm -f /etc/nginx/conf.d/* &> /dev/null
+rm -f /etc/nginx/locations/*
+rm -f /etc/nginx/conf.d/*
 
 #### /etc/nginx/passwd/MySB
 if [ ! -z "$gsMySB_User" ]; then
@@ -57,7 +57,7 @@ cmdMySQL 'MySB_db' "UPDATE system SET mysb_user = '$sUser', mysb_password = '$sP
 if [ ! -f /etc/nginx/passwd/MySB ]; then
 	touch /etc/nginx/passwd/MySB
 fi
-htpasswd -bs /etc/nginx/passwd/MySB $sUser $sPassword &> /dev/null
+htpasswd -bs /etc/nginx/passwd/MySB $sUser $sPassword
 chmod -v 640 /etc/nginx/passwd/MySB
 chown -v www-data:www-data /etc/nginx/passwd/MySB
 
@@ -141,11 +141,11 @@ if [ -f /etc/sudoers.d/MySB_nginx ]; then rm -vf /etc/sudoers.d/MySB_nginx; fi
 echo "www-data ALL = (root) NOPASSWD: /bin/bash $MySB_InstallDir/scripts/ApplyConfig.bsh*" | tee -a /etc/sudoers.d/MySB_nginx
 
 #### Add www-data to MySB_users group
-addgroup www-data MySB_users &> /dev/null
+addgroup www-data MySB_users
 
 #### Remove errors logs
-rm -f /var/log/nginx/error.log &> /dev/null
-rm -f /var/log/nginx/*-error.log &> /dev/null
+rm -f /var/log/nginx/error.log
+rm -f /var/log/nginx/*-error.log
 
 #### START services
 gfnManageServices start "nginx"
