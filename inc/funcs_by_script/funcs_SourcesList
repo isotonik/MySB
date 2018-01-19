@@ -221,19 +221,15 @@ gfnCreateBasicSourcesList() {
 #### DotDeb Mirrors
 CreateDotDebRepo() {
 	# Remove current lists
-	rm -f /etc/apt/sources.list.d/dotdeb*.list &> /dev/null
+	rm -f /etc/apt/sources.list.d/dotdeb*.list
 	# DotDeb
 	echo "# DotDeb" | tee -a /etc/apt/sources.list.d/dotdeb.list
 	echo "deb http://packages.dotdeb.org $gsDebianRelease all" | tee -a /etc/apt/sources.list.d/dotdeb.list
 	echo "deb http://dotdeb.debian.skynet.be $gsDebianRelease all" | tee -a /etc/apt/sources.list.d/dotdeb.list
 
 	# DotDeb GPG key
-	if [ ! -f $MySB_InstallDir/files/repos_keys/dotdeb.key ]; then
-		$binCURL -o "$MySB_InstallDir/files/repos_keys/dotdeb.key" "http://www.dotdeb.org/dotdeb.gpg"
-	fi
-	if [ -f $MySB_InstallDir/files/repos_keys/dotdeb.key ]; then
-		apt-key add $MySB_InstallDir/files/repos_keys/dotdeb.key
-	fi
+	[ ! -f $MySB_InstallDir/files/repos_keys/dotdeb.key ] && $binCURL -o "$MySB_InstallDir/files/repos_keys/dotdeb.key" "http://www.dotdeb.org/dotdeb.gpg"
+	[ -f $MySB_InstallDir/files/repos_keys/dotdeb.key ] && apt-key add $MySB_InstallDir/files/repos_keys/dotdeb.key
 }
 
 ##################### LAST LINE ######################################

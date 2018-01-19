@@ -246,15 +246,15 @@ gfnSwitchDNS() {
 				sed -i "${NumLign}i\        // DNScrypt-proxy - EoF" /etc/bind/named.conf.options
 				# BIND delete DNScrypt-proxy support
 				if [ -z "`crontab -l | grep 'dnscrypt-proxy cron-check'`" ]; then
-					crontab -l > /tmp/crontab.tmp 2> /dev/null
-					echo "0 4 * * * service dnscrypt-proxy full-update > /dev/null 2>&1" >> /tmp/crontab.tmp
-					echo "*/5 * * * * service dnscrypt-proxy cron-check > /dev/null 2>&1" >> /tmp/crontab.tmp
-					crontab /tmp/crontab.tmp 2> /dev/null
-					rm -f /tmp/crontab.tmp > /dev/null 2>&1
-					if gfnGetPid cron; then service cron reload > /dev/null 2>&1; fi
+					crontab -l > /tmp/crontab.tmp 2> | gfnGlobalLogCatching
+					echo "0 4 * * * service dnscrypt-proxy full-update 2>&1 | gfnGlobalLogCatching" >> /tmp/crontab.tmp
+					echo "*/5 * * * * service dnscrypt-proxy cron-check 2>&1 | gfnGlobalLogCatching" >> /tmp/crontab.tmp
+					crontab /tmp/crontab.tmp 2> | gfnGlobalLogCatching
+					rm -f /tmp/crontab.tmp 2>&1 | gfnGlobalLogCatching
+					if gfnGetPid cron; then service cron reload 2>&1 | gfnGlobalLogCatching; fi
 					gfnMessage 'info' 'log' 'Crontab added'
 				fi
-				service bind9 restart > /dev/null
+				service bind9 restart 2>&1 | gfnGlobalLogCatching
 			fi
 		;;
 		'bind')
@@ -271,17 +271,17 @@ gfnSwitchDNS() {
 			echo "nameserver 4.2.2.5" >> /etc/resolv.conf
 			echo "nameserver 4.2.2.6" >> /etc/resolv.conf
 			# BIND delete DNScrypt-proxy support
-			crontab -l > /tmp/crontab.tmp 2> /dev/null
+			crontab -l > /tmp/crontab.tmp 2> | gfnGlobalLogCatching
 			sed -i "/dnscrypt-proxy/d" /tmp/crontab.tmp
-			crontab /tmp/crontab.tmp 2> /dev/null
-			rm -f /tmp/crontab.tmp > /dev/null 2>&1
-			if gfnGetPid cron; then service cron reload > /dev/null 2>&1; fi
+			crontab /tmp/crontab.tmp 2> | gfnGlobalLogCatching
+			rm -f /tmp/crontab.tmp 2>&1 | gfnGlobalLogCatching
+			if gfnGetPid cron; then service cron reload 2>&1 | gfnGlobalLogCatching; fi
 			if gfnCheckCommand 0 bind9; then
 				sed -i '/forwarders/d' /etc/bind/named.conf.options
 				sed -i '/forward only;/d' /etc/bind/named.conf.options
 				sed -i '/version/d' /etc/bind/named.conf.options
 				sed -i '/DNScrypt-proxy/d' /etc/bind/named.conf.options
-				service bind9 restart > /dev/null
+				service bind9 restart 2>&1 | gfnGlobalLogCatching
 			fi
 		;;
 	esac
@@ -331,9 +331,9 @@ gfnCleanBeforeUpgrade() {
 	cd $MySB_InstallDir/
 	git branch | grep -v "$gsCurrentVersion" | xargs git branch -D
 	git tag | grep -v "$gsCurrentVersion" | xargs git tag -d
-	git gc
-	git repack -Ad
-	git prune
+	# git gc
+	# git repack -Ad
+	# git prune
 	clear
 
 	# Clean files tracked by LFS
@@ -574,6 +574,19 @@ gfnPluginCheckdiskQuotas() {
 		echo "total:$Total" > /home/$seedUser/rtorrent/.session/quota.txt
 		echo "free:$Free" >> /home/$seedUser/rtorrent/.session/quota.txt
 	done
+}
+
+#### General log catching stdout and stderr
+gfnGlobalLogCatching() {
+	if [ -n "$1" ]; then
+		IN="$1"
+	else
+		read IN # This reads a string from stdin and stores it in a variable called IN
+	fi
+
+	echo "`/bin/date '+%Y-%m-%d - %H:%M:%S'`    --> $0" >> $MySB_InstallDir/logs/Global.log
+	echo "$IN" >> $MySB_InstallDir/logs/Global.log
+	echo >> $MySB_InstallDir/logs/Global.log
 }
 
 ##################### LAST LINE ######################################

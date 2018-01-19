@@ -31,9 +31,7 @@ gfnUpgradeInProgress() {
 	case "$1" in
 		"on")
 			# Nextcloud
-			if [ "$gbIsInstalled_NextCloud" == "YES" ]; then
-				su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" &> /dev/null
-			fi
+			[ "$gbIsInstalled_NextCloud" == "YES" ] && su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ maintenance:mode --on" 2>&1 | gfnGlobalLogCatching
 			# rTorrent sessions
 			sRtorrentSessions="`ls -1r /etc/init.d/rtorrent-* | cut -d '/' -f 4`"
 			for sSession in $sRtorrentSessions; do
@@ -41,35 +39,29 @@ gfnUpgradeInProgress() {
 			done
 			ServicesToStop="${ServicesToStop} $sAllSessions"
 			# Stopping some services like Plex or OpenVPN
-			if [ "$gbIsInstalled_OpenVPN" == "YES" ]; then
-				ServicesToStop="${ServicesToStop} openvpn"
-			fi
-			if [ "$gbIsInstalled_PlexMedia" == "YES" ]; then
-				ServicesToStop="${ServicesToStop} plexmediaserver"
-			fi
-			if [ "$gbIsInstalled_PlexPy" == "YES" ]; then
-				ServicesToStop="${ServicesToStop} plexpy"
-			fi
+			[ "$gbIsInstalled_OpenVPN" == "YES" ] && ServicesToStop="${ServicesToStop} openvpn"
+			[ "$gbIsInstalled_PlexMedia" == "YES" ] && ServicesToStop="${ServicesToStop} plexmediaserver"
+			[ "$gbIsInstalled_PlexPy" == "YES" ] && ServicesToStop="${ServicesToStop} plexpy"
 			# Stop services
 			gfnManageServices 'stop' "$ServicesToStop"
 			# NginX
-			if [ -h /etc/nginx/sites-enabled/WiP ]; then rm -f /etc/nginx/sites-enabled/WiP; fi
-			if [ -h /etc/nginx/sites-enabled/default ]; then rm -f /etc/nginx/sites-enabled/default; fi
-			if [ -h /etc/nginx/sites-enabled/cakebox ]; then rm -f /etc/nginx/sites-enabled/cakebox; fi
+			rm -f /etc/nginx/sites-enabled/WiP
+			rm -f /etc/nginx/sites-enabled/default
+			rm -f /etc/nginx/sites-enabled/cakebox
 			cp $MySB_InstallDir/templates/nginx/etc.nginx.site-enabled.WiP.tmpl /etc/nginx/sites-available/WiP
 			perl -pi -e "s/<InstallDir>/$gsInstallDirEscaped/g" /etc/nginx/sites-available/WiP
 			perl -pi -e "s/<PORT_HTTPS>/$gsPort_HTTPS/g" /etc/nginx/sites-available/WiP
 			perl -pi -e "s/<PORT_HTTP>/$gsPort_HTTP/g" /etc/nginx/sites-available/WiP
 			perl -pi -e "s/<server_name>/$gsHostNameFqdn/g" /etc/nginx/sites-available/WiP
-			if [ ! -h /etc/nginx/sites-enabled/WiP ]; then ln -s /etc/nginx/sites-available/WiP /etc/nginx/sites-enabled/WiP; fi
+			[ ! -h /etc/nginx/sites-enabled/WiP ] && ln -s /etc/nginx/sites-available/WiP /etc/nginx/sites-enabled/WiP
 			# Start services
 			gfnManageServices 'start' "nginx"
 		;;
 		"off")
 			gfnManageServices 'stop' "nginx"
-			if [ -h /etc/nginx/sites-enabled/WiP ]; then rm -f /etc/nginx/sites-enabled/WiP; fi
-			if [ ! -h /etc/nginx/sites-enabled/default ]; then ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default; fi
-			if [ ! -h /etc/nginx/sites-enabled/cakebox ]; then ln -s /etc/nginx/sites-available/cakebox /etc/nginx/sites-enabled/cakebox; fi
+			rm -f /etc/nginx/sites-enabled/WiP
+			[ ! -h /etc/nginx/sites-enabled/default ] && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+			[ ! -h /etc/nginx/sites-enabled/cakebox ] && ln -s /etc/nginx/sites-available/cakebox /etc/nginx/sites-enabled/cakebox
 			gfnManageServices 'start' "nginx cron"
 		;;
 	esac

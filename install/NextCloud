@@ -365,7 +365,7 @@ EOF
 				OC_PASS="`gfnGenPassword 8`"
 				export OC_PASS
 				TimeStamp=$(date +%s)
-				su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:add --password-from-env --display-name=\"$seedUser\" --group=\"MySB_users\" $seedUser" &> /dev/null
+				su -s /bin/sh www-data -c "/usr/bin/php $gsNextCloudDir/occ user:add --password-from-env --display-name=\"$seedUser\" --group=\"MySB_users\" $seedUser"
 				cmdMySQL 'NextCloud_db' "INSERT INTO nc_preferences (userid,appid,configkey,configvalue) VALUES ('admin','files_external','/Home_$seedUser','$TimeStamp');" -v
 				cmdMySQL 'NextCloud_db' "INSERT INTO nc_preferences (userid,appid,configkey,configvalue) VALUES ('$seedUser','core','lang','$EnvLang');" -v
 				cmdMySQL 'NextCloud_db' "INSERT INTO nc_preferences (userid,appid,configkey,configvalue) VALUES ('$seedUser','settings','email','$FnUserMail');" -v

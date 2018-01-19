@@ -108,8 +108,8 @@ gfnPackagesManage() {
 		if [ "$gbIsReady_MySB_Db" == "YES" ]; then
 			#### Need of 'apt-get update' ? (must be greater than 2 hours OR forced)
 			if [ $nAptUpdate -eq 1 ]; then
-				rm /var/lib/apt/lists/* &> /dev/null
-				rm /var/lib/apt/lists/partial/* &> /dev/null
+				rm -f /var/lib/apt/lists/*
+				rm -f /var/lib/apt/lists/partial/*
 			fi
 			if [ $nAptUpdate -eq 1 ] || [ $tDiff -gt 2 ] || [ "$sQuery" == "upgrade" ]; then
 				if gfnCheckCommand 0 apt-mirror && [ -f $MySB_InstallDir/files/apt_mirrors/var/postmirror.sh ]; then

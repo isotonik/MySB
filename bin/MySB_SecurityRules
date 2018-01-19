@@ -145,18 +145,10 @@ case "$InitSwitch" in
 	;;
 esac
 
-if [ "$ApplyConfigBind" == "YES" ]; then
-	ServicesToRestart="${ServicesToRestart} bind9"
-fi
-if [ "$ApplyConfigFail2Ban" == "YES" ]; then
-	ServicesToRestart="${ServicesToRestart} fail2ban"
-fi
-if [ "$ApplyConfigPeerGuardian" == "YES" ]; then
-	ServicesToRestart="${ServicesToRestart} pglcmd"
-fi
-if [ "$ApplyConfigNginx" == "YES" ]; then
-	ServicesToRestart="${ServicesToRestart} nginx"
-fi
+[ "$ApplyConfigBind" == "YES" ] && ServicesToRestart="${ServicesToRestart} bind9"
+[ "$ApplyConfigFail2Ban" == "YES" ] && ServicesToRestart="${ServicesToRestart} fail2ban"
+[ "$ApplyConfigPeerGuardian" == "YES" ] && ServicesToRestart="${ServicesToRestart} pglcmd"
+[ "$ApplyConfigNginx" == "YES" ] && ServicesToRestart="${ServicesToRestart} nginx"
 if gfnCheckCommand 0 dnscrypt-proxy; then
 	case "$gbDnsCryptSwitch" in
 		'0')	ServicesToStop="${ServicesToStop} dnscrypt-proxy";;

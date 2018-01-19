@@ -134,7 +134,7 @@ gfnPackagesManage purge "$ToRemove"
 
 #### Delete files and directories
 rm -f /etc/init.d/rtorrent-*
-rm -f /etc/apt/sources.list.d/* &> /dev/null
+rm -f /etc/apt/sources.list.d/*
 if [ -f /etc/init.d/dnscrypt-proxy ]; then rm -f /etc/init.d/dnscrypt-proxy; fi
 if [ -f /var/log/dnscrypt-proxy.log ]; then rm -f /var/log/dnscrypt-proxy.log; fi
 if [ -f /var/log/vsftpd.log ]; then rm -f /var/log/vsftpd.log; fi
