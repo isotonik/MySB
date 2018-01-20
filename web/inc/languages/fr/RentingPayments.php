@@ -29,7 +29,6 @@ define('MainUser_Renting_Date', 'Date :');
 define('MainUser_Renting_AddAmount', 'Ajouter un autre versement');
 define('MainUser_Renting_DelAmount', 'Retirer le dernier versement');
 define('MainUser_Renting_SaveAmount', 'Enregistrer les versements');
-define('MainUser_Renting_TitleUser', 'Utilisateur');
 define('MainUser_Renting_TitleDate', 'Date');
 define('MainUser_Renting_TitleAmount', 'Versement');
 

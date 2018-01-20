@@ -29,7 +29,6 @@ define('MainUser_Renting_Date', 'Date :');
 define('MainUser_Renting_AddAmount', 'Add an other amount');
 define('MainUser_Renting_DelAmount', 'Remove the last amount');
 define('MainUser_Renting_SaveAmount', 'Save amounts');
-define('MainUser_Renting_TitleUser', 'User');
 define('MainUser_Renting_TitleDate', 'Date');
 define('MainUser_Renting_TitleAmount', 'Amount');
 

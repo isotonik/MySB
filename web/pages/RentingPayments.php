@@ -29,7 +29,7 @@ function Form() {
 
 	// Users table
 	$renting_datas = $MySB_DB->get("system", ["rt_model", "rt_cost_tva", "rt_nb_users", "rt_method"], ["id_system" => 1]);
-	$Rent_Payments = $MySB_DB->select("tracking_rent_payments", ["id_tracking_rent_payments", "id_users", "payment_date", "amount"]);
+	$AllUsers = $MySB_DB->select("users", ["id_users", "users_ident"], ["id_users[!]" => 1]);
 	$nTotalUsers = $renting_datas["rt_nb_users"];
 	$Model = $renting_datas["rt_model"];
 	$GlobalCostTVA = $renting_datas["rt_cost_tva"];
@@ -48,7 +48,6 @@ function Form() {
 							. MainUser_Renting_User . '&nbsp;
 							<select class="select_user" id="select_user" name="select_user[1]" style="width:200px; height: 28px; cursor: pointer;" required>';
 
-							$AllUsers = $MySB_DB->select("users", ["id_users", "users_ident"], ["id_users[!]" => 1]);
 							foreach($AllUsers as $User) {
 								echo '<option value="' . $User["id_users"] . '">' . $User["users_ident"] . '</option>';
 							}
@@ -69,32 +68,33 @@ function Form() {
 		</div>';
 	}
 
-	if (!empty($Rent_Payments)) {
-		echo '<div align="center">
-				<form class="form_settings" method="post" action="">
-				<fieldset><legend>Versements</legend>
-					<table style="border-spacing:1;">
-						<tr>
-							<th style="text-align:center;">' . MainUser_Renting_TitleUser . '</th>
-							<th style="text-align:center;">' . MainUser_Renting_TitleDate . '</th>
-							<th style="text-align:center;">' . MainUser_Renting_TitleAmount . '</th>
-							<th style="text-align:center;">' . Global_Table_Delete . '</th>
-						</tr>';
+	echo '<div align="center"><table><tr>';
+	foreach($AllUsers as $User) {
+		$Rent_Payments = $MySB_DB->select("tracking_rent_payments", ["id_tracking_rent_payments", "id_users", "payment_date", "amount"], ["id_users" => $User["id_users"]]);
+
+		if (!empty($Rent_Payments)) {
+			echo '	<td style="margin:0; padding:0; border:0; outline:0; font-size:100%; vertical-align:top; background:transparent;">
+					<form class="form_settings" method="post" action="">
+					<fieldset><legend>'.$User["users_ident"].'</legend>
+						<table style="border-spacing:1;">
+							<tr>
+								<th style="text-align:center;">' . MainUser_Renting_TitleDate . '</th>
+								<th style="text-align:center;">' . MainUser_Renting_TitleAmount . '</th>
+								<th style="text-align:center;">' . Global_Table_Delete . '</th>
+							</tr>';
 
 			foreach($Rent_Payments as $Payment) {
-				$UserName = $MySB_DB->get("users", "users_ident", ["id_users" => $Payment["id_users"]]);
-
 				echo '	<tr>
-							<td><div align="center">' . $UserName . '</div></td>
 							<td><div align="center">' . $Payment["payment_date"] . '</div></td>
 							<td><div align="center">' . $Payment["amount"] . '</div></td>
 							<td><div align="center"><input class="submit" name="submit['.$Payment["id_tracking_rent_payments"].']" type="submit" value="' . Global_Delete . '" /></div></td>
 						</tr>';
 			}
 
-			echo '	</table>
-				</fieldset></form></div>';
+			echo '	</table></fieldset></form></td>';
+		}
 	}
+	echo '</tr></table></div>';
 
 	echo '<script type="text/javascript" src="' . THEMES_PATH . 'MySB/js/jquery-dynamically-adding-form-elements.js"></script>';
 }
