@@ -38,6 +38,7 @@ define('MainUser_UserAdd_Table_Quota', 'Quota');
 define('MainUser_UserAdd_Table_Password', 'Password');
 define('MainUser_UserAdd_Table_AccountType', 'Account type');
 define('MainUser_UserAdd_Table_Treasury', 'Treasury');
+define('MainUser_UserAdd_Table_CreatedAt', 'Creation date');
 define('MainUser_UserAdd_PasswordOK', 'Changed');
 define('MainUser_UserAdd_PasswordKO', 'Temporary');
 define('MainUser_UserAdd_Comment', 'A "<b>normal</b>" account will have all services.<br />A "<b>plex</b>" account will have no service. This type of account is recommended for users accessing Plex only.<br />Services such as ruTorrent, Cakebox, Seedbox Manager, OpenVPN and NextCloud will not be available.<br />A plex account does not reduce the disk quota of other users.');

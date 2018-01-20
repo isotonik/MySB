@@ -122,7 +122,7 @@ if(isset($_POST)==true && empty($_POST)==false) {
 
 Form();
 
-$sUsersList = $MySB_DB->select("users", ["id_users", "users_ident", "users_passwd", "users_email", "quota", "account_type"], ["AND" => ["is_active" => "1"]]);
+$sUsersList = $MySB_DB->select("users", ["id_users", "users_ident", "users_passwd", "users_email", "quota", "account_type", "created_at"], ["AND" => ["is_active" => "1"]]);
 $system_datas = $MySB_DB->get("system", ["rt_model", "rt_cost_tva"], ["id_system" => 1]);
 
 if ( !empty($sUsersList) ) {
@@ -135,6 +135,7 @@ if ( !empty($sUsersList) ) {
 				<th style="text-align:center;"><?php echo MainUser_UserAdd_Table_Password; ?></th>
 				<th style="text-align:center;"><?php echo MainUser_UserAdd_Table_AccountType; ?></th>
 				<th style="text-align:center;"><?php echo MainUser_UserAdd_Table_Quota; ?></th>
+				<th style="text-align:center;"><?php echo MainUser_UserAdd_Table_CreatedAt; ?></th>
 <?php
 	if ( !empty($system_datas["rt_cost_tva"]) && !empty($system_datas["rt_model"]) ) {
 ?>
@@ -199,6 +200,7 @@ if ( !empty($sUsersList) ) {
 							break;
 					} ?>
 				</td>
+				<td><?php echo $User["created_at"]; ?></td>
 <?php
 	if ( !empty($system_datas["rt_cost_tva"]) && !empty($system_datas["rt_model"]) ) {
 ?>
