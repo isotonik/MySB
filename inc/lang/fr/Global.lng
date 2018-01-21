@@ -52,6 +52,8 @@ Global_Subject_rTorrentNotify="MySB - Nouveaux fichiers disponibles !"
 
 Global_Error_StatusSTD="${CRED}On dirait que quelque chose ne va pas, vérifiez le log '$MySB_InstallDir/logs/$gsScriptName.*', abandon.$CEND"
 
+Global_WaitingForTaskFinish="Le script $gsScriptName est cours d'exécution, attente..."
+
 Funcs_Stopping="Arrêt de"
 Funcs_Killing="Arrêt forcé de"
 Funcs_Restarting="Redémarrage de"

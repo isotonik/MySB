@@ -31,6 +31,24 @@ if [ -z "$funcs_tools" ] || [ $funcs_tools -eq 0 ]; then
 	source $MySB_InstallDir/inc/funcs_tools
 fi
 
+#### Current actions
+gfnGetCurrentAction() {
+	local
+
+	case "$gsScriptName" in
+		'MySB_SecurityRules')
+			if [ ! -z "`ps ax | grep -v 'grep' | grep '$gsScriptName'`" ]; then
+				log_daemon_msg "$Global_WaitingForTaskFinish"
+				while [ ! -z "`ps ax | grep -v 'grep' | grep '$gsScriptName'`" ]; do
+					echo -n "."
+					sleep 0.5
+				done
+				gfnStatusLSB
+			fi
+		;;
+	esac
+}
+
 #### Banner
 gfnBannerGenerator() {
 	local nCountLine sLine
